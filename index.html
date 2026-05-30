@@ -2,12 +2,11 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Hardopera</title>
     <meta name="keywords" content="Hardopera, Hardstyle Opera, Hardstyle, Opera" />
-    <meta name="description" content="We're a passionate lover of hardstyle's explosive energy and opera's majestic grandeur, with a dream to fuse these two art forms into something entirely new." />
+    <meta name="description" content="We're passionate lover of hardstyle's explosive energy and opera's majestic grandeur, with a dream to fuse these two art forms into something entirely new." />
     <link rel="icon" href="https://hardopera.com/favicon.gif" type="image/gif" />
     <link rel=apple-touch-icon href="https://hardopera.com/apple-touch-icon.png">
 
@@ -23,9 +22,7 @@
         }
         html, body {
             width: 100%;
-            height: 100%;
-            overflow: hidden;
-            touch-action: none;
+            min-height: 100vh;
             background: #050010;
             font-family: 'Poppins', sans-serif;
             color: #fff;
@@ -37,7 +34,6 @@
             height: 100%;
             top: 0;
             left: 0;
-            background: #050010;
             z-index: 1;
         }
         .fractal-layer {
@@ -60,11 +56,11 @@
             position: relative;
             z-index: 10;
             width: 100%;
-            height: 100%;
+            min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
-            padding: 15px;
+            padding: 60px 20px;
         }
         .content {
             text-align: center;
@@ -73,30 +69,30 @@
         }
         h1 {
             font-family: 'Orbitron', sans-serif;
-            font-size: clamp(32px, 8vw, 68px);
+            font-size: clamp(36px, 10vw, 72px);
             font-weight: 900;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             letter-spacing: 1px;
             text-shadow: 0 0 20px rgba(0,255,255,0.4);
         }
         p {
             font-family: 'Poppins', sans-serif;
-            font-size: clamp(14px, 2.5vw, 18px);
-            line-height: 1.7;
-            color: rgba(255,255,255,0.8);
-            margin-bottom: 14px;
+            font-size: clamp(15px, 3.5vw, 18px);
+            line-height: 1.8;
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 20px;
         }
         strong {
             font-family: 'Cormorant Garamond', serif;
             font-weight: 700;
-            font-size: clamp(16px, 3vw, 20px);
+            font-size: clamp(16px, 4vw, 21px);
             color: #00ffff;
             text-shadow: 0 0 10px rgba(0,255,255,0.3);
         }
         a {
             color: #CCC;
             text-decoration: none;
-            padding: 2px 6px;
+            padding: 4px 8px;
             transition: all 0.3s ease;
             display: inline-block;
         }
@@ -105,10 +101,11 @@
             text-shadow: 0 0 8px rgba(255,0,0,0.5);
         }
         .footer-text {
-            margin-top: 30px;
-            font-size: clamp(13px, 2vw, 16px);
-            opacity: 0.7;
+            margin-top: 40px;
+            font-size: clamp(14px, 3vw, 16px);
+            opacity: 0.8;
             font-family: 'Orbitron', sans-serif;
+            line-height: 1.6;
         }
     </style>
 </head>
@@ -133,6 +130,7 @@
         Human creativity × AI collaboration</p>
 
         <p><strong>This isn't just an audio revolution—it's a complete artistic product line:</strong><br>
+        Hardopera Game<br>
         🔥 Hardopera limited-edition apparel collection<br>
         🚗 Hardopera automotive wrap designs<br>
         🖼️ Hardopera digital wallpaper sets<br>

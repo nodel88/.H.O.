@@ -2,14 +2,17 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 手机端完美自适应关键配置 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Hardopera</title>
-    <meta name="keywords" content="Hardopera, Hardopera, Hardstyle Opera, Hardstyle, Opera" />
-    <meta name="description" content="We're a passionate lover of hardstyle's explosive energy and opera's majestic grandeur, with a dream to fuse these two art forms into something entirely new. Hardopera. This isn't just a website—it's an artistic revolution." />
+    <meta name="keywords" content="Hardopera, Hardstyle Opera, Hardstyle, Opera" />
+    <meta name="description" content="We're a passionate lover of hardstyle's explosive energy and opera's majestic grandeur, with a dream to fuse these two art forms into something entirely new." />
     <link rel="icon" href="https://hardopera.com/favicon.gif" type="image/gif" />
     <link rel=apple-touch-icon href="https://hardopera.com/apple-touch-icon.png" />
 
-    <!-- 2.txt 同款原装艺术字体 -->
+    <!-- 字体链接保留 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Poppins:wght@400;600&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
@@ -28,8 +31,10 @@
             background: #050010;
             font-family: 'Poppins', sans-serif;
             color: #fff;
+            /* 手机禁止滚动回弹 */
+            overscroll-behavior: none;
         }
-        /* 2.txt 三层分形画布背景 */
+        /* 三层分形背景 全屏适配 */
         #game-world {
             position: fixed;
             width: 100%;
@@ -55,7 +60,7 @@
             mix-blend-mode: color-dodge;
             opacity: 0.6;
         }
-        /* 文字内容层 置顶居中 */
+        /* 内容居中 手机自适应 */
         .content-wrap {
             position: relative;
             z-index: 10;
@@ -64,34 +69,35 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 15px;
         }
         .content {
             text-align: center;
-            max-width: 68%;
+            width: 100%;
+            max-width: 700px;
         }
-        /* 主标题 Orbitron 粗科技字体 */
+        /* 标题自适应 电脑大/手机自动缩小 */
         h1 {
             font-family: 'Orbitron', sans-serif;
-            font-size: 68px;
+            font-size: clamp(32px, 8vw, 68px);
             font-weight: 900;
-            margin-bottom: 24px;
-            letter-spacing: 2px;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
             text-shadow: 0 0 20px rgba(0,255,255,0.4);
         }
-        /* 正文 Poppins 标准字体 */
+        /* 正文自适应字体大小 */
         p {
             font-family: 'Poppins', sans-serif;
-            font-size: 18px;
-            line-height: 1.8;
+            font-size: clamp(14px, 2.5vw, 18px);
+            line-height: 1.7;
             color: rgba(255,255,255,0.8);
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
-        /* 加粗强调字 Cormorant Garamond 歌剧优雅字体 */
+        /* 强调文字自适应 */
         strong {
             font-family: 'Cormorant Garamond', serif;
             font-weight: 700;
-            font-size: 20px;
+            font-size: clamp(16px, 3vw, 20px);
             color: #00ffff;
             text-shadow: 0 0 10px rgba(0,255,255,0.3);
         }
@@ -99,16 +105,17 @@
         a {
             color: #CCC;
             text-decoration: none;
-            padding: 4px 8px;
+            padding: 2px 6px;
             transition: all 0.3s ease;
+            display: inline-block;
         }
         a:hover {
             color: #F00;
             text-shadow: 0 0 8px rgba(255,0,0,0.5);
         }
         .footer-text {
-            margin-top: 40px;
-            font-size: 16px;
+            margin-top: 30px;
+            font-size: clamp(13px, 2vw, 16px);
             opacity: 0.7;
             font-family: 'Orbitron', sans-serif;
         }
@@ -116,13 +123,13 @@
 </head>
 <body>
 
-<!-- 2.txt 原版三层分形背景画布 -->
+<!-- 三层分形背景 全屏自适应 -->
 <div id="game-world">
     <canvas id="background-canvas" class="fractal-layer"></canvas>
     <canvas id="mid-canvas" class="fractal-layer"></canvas>
 </div>
 
-<!-- 原文内容 1:1 保留 -->
+<!-- 文字内容 手机自动适配 -->
 <div class="content-wrap">
     <div class="content">
         <h1>Hardopera</h1>
@@ -154,7 +161,6 @@
     </div>
 </div>
 
-<!-- 2.txt 原版分形星云背景动效 + 随机刷新变化 -->
 <script>
 const bgCanvas = document.getElementById('background-canvas');
 const midCanvas = document.getElementById('mid-canvas');
@@ -164,14 +170,15 @@ const midCtx = midCanvas.getContext('2d');
 let width, height;
 let fractalTime = 0;
 
-// ========== 随机分形参数（每次刷新都会变）==========
+// 每次刷新随机分形参数
 const seed = Math.random();
-const fractalBranches = Math.floor(3 + seed * 6);    // 随机分支数
-const fractalDepth = Math.floor(4 + seed * 3);        // 随机深度
-const fractalLength = 80 + seed * 80;                 // 随机长度
-const fractalAngle = 0.3 + seed * 0.7;                // 随机角度
-const rotateSpeed = 0.02 + seed * 0.06;               // 随机旋转速度
+const fractalBranches = Math.floor(3 + seed * 6);
+const fractalDepth = Math.floor(4 + seed * 3);
+const fractalLength = 70 + seed * 90;
+const fractalAngle = 0.3 + seed * 0.7;
+const rotateSpeed = 0.02 + seed * 0.06;
 
+// 自适应画布大小
 function resizeCanvas() {
     width = window.innerWidth;
     height = window.innerHeight;
@@ -183,7 +190,7 @@ function resizeCanvas() {
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
-// 随机星云颜色
+// 随机星云配色
 const colorSet = [
     ['#ff00ff', '#00ffff', '#7000ff'],
     ['#ff66ff', '#00ffcc', '#9944ff'],
@@ -192,13 +199,13 @@ const colorSet = [
 ];
 const randomColors = colorSet[Math.floor(Math.random() * colorSet.length)];
 
-// 星云点位
-const nebulaPoints = Array.from({length: 15 + Math.floor(Math.random() * 10)}, () => ({
+// 星云粒子随机生成
+const nebulaPoints = Array.from({length: 12 + Math.floor(Math.random() * 8)}, () => ({
     x: Math.random() * 3000,
     y: Math.random() * 3000,
-    size: 300 + Math.random() * 800,
+    size: 280 + Math.random() * 700,
     color: Math.floor(Math.random() * randomColors.length),
-    speed: 0.15 + Math.random() * 0.6,
+    speed: 0.15 + Math.random() * 0.5,
     phase: Math.random() * Math.PI * 2
 }));
 
@@ -208,11 +215,10 @@ const palette = {
     accent: randomColors[Math.floor(Math.random() * randomColors.length)]
 };
 
-// 动画循环
+// 分形动画
 function animate(timestamp) {
     fractalTime = timestamp / 1000;
 
-    // 背景星云
     bgCtx.clearRect(0, 0, width, height);
     nebulaPoints.forEach(p => {
         const pulse = Math.sin(fractalTime * p.speed + p.phase);
@@ -221,7 +227,7 @@ function animate(timestamp) {
             width / 2, height / 2, 0,
             width / 2, height / 2, size
         );
-        g.addColorStop(0, palette.stars[p.color] + '70');
+        g.addColorStop(0, palette.stars[p.color] + '60');
         g.addColorStop(1, 'transparent');
         bgCtx.fillStyle = g;
         bgCtx.beginPath();
@@ -229,7 +235,6 @@ function animate(timestamp) {
         bgCtx.fill();
     });
 
-    // 中分形旋转线条（随机样式）
     midCtx.clearRect(0, 0, width, height);
     midCtx.save();
     midCtx.translate(width / 2, height / 2);
@@ -259,7 +264,7 @@ function animate(timestamp) {
 animate(0);
 </script>
 
-<!-- 原统计代码 -->
+<!-- 统计代码 -->
 <script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
 <script>LA.init({id:"L2zFVRorfv9q3qJ4",ck:"L2zFVRorfv9q3qJ4"})</script>
 

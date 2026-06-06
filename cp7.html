@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hardopera">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#020010">
+  <meta name="description" content="Hardopera · 分形漫游 - 收集分形碎片，探索无限维度">
+  <title>Hardopera · 分形漫游</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #020010;
+      font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+    .game-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      width: 100dvw;
+      height: 100vh;
+      height: 100dvh;
+      background: radial-gradient(circle at 20% 20%, #2a1f3a, #110b22);
+      box-shadow: inset 0 0 80px rgba(140, 100, 210, 0.3);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      color: #e3def0;
+      z-index: 1;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      z-index: 2;
+    }
+    .ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(0.4rem, 2.5vw, 1.8rem) clamp(0.4rem, 2.5vw, 1.6rem) clamp(0.4rem, 2.5vw, 1.8rem) clamp(0.4rem, 2.5vw, 1.6rem);
+      padding-top: calc(clamp(0.4rem, 2.5vw, 1.8rem) + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(clamp(0.4rem, 2.5vw, 1.8rem) + env(safe-area-inset-bottom, 0px));
+      padding-left: calc(clamp(0.4rem, 2.5vw, 1.6rem) + env(safe-area-inset-left, 0px));
+      padding-right: calc(clamp(0.4rem, 2.5vw, 1.6rem) + env(safe-area-inset-right, 0px));
+      z-index: 10;
+    }
+    .top-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: auto;
+    }
+    .game-title {
+      font-size: clamp(1.2rem, 4.5vw, 2.4rem);
+      font-weight: 400;
+      letter-spacing: 2.5px;
+      color: #cbbee8;
+      text-shadow: 0 0 24px rgba(150, 120, 210, 0.9);
+      background: rgba(10, 8, 20, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 0.25rem 1.6rem;
+      border-radius: 4rem;
+      border: 0.5px solid rgba(180, 150, 230, 0.4);
+      white-space: nowrap;
+    }
+    .bottom-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: auto;
+      background: rgba(18, 14, 30, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 3rem;
+      padding: clamp(0.3rem, 1.6vw, 0.7rem) clamp(0.6rem, 3vw, 1.4rem);
+      margin-top: auto;
+      color: #d1c9ed;
+      font-size: clamp(0.75rem, 2.3vw, 1rem);
+      gap: 0.3rem;
+      flex-wrap: wrap;
+      border: 0.5px solid rgba(150, 130, 200, 0.5);
+      transition: all 0.3s ease;
+    }
+    .progress-area {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-weight: 300;
+      color: #c4b8e8;
+      flex-shrink: 0;
+    }
+    .level-num {
+      font-size: clamp(0.9rem, 3.5vw, 1.4rem);
+      font-weight: 400;
+      background: rgba(50, 40, 70, 0.7);
+      padding: 0.15rem 0.6rem;
+      border-radius: 2.5rem;
+      min-width: 2em;
+      text-align: center;
+    }
+    .dots-row {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .dot-indicator {
+      width: clamp(5px, 1.6vw, 9px);
+      height: clamp(5px, 1.6vw, 9px);
+      border-radius: 50%;
+      background: #8b7db5;
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+    }
+    .dot-indicator.collected {
+      background: #e8d2ff;
+      box-shadow: 0 0 14px #d4a7ff;
+      animation: dotPulse 0.4s ease-out;
+    }
+    @keyframes dotPulse {
+      0% { transform: scale(1.8); box-shadow: 0 0 24px #e8d2ff; }
+      100% { transform: scale(1); box-shadow: 0 0 14px #d4a7ff; }
+    }
+    .icon-group {
+      display: flex;
+      gap: clamp(0.2rem, 1.8vw, 0.7rem);
+      align-items: center;
+      color: #cfc4f2;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      color: inherit;
+      font-size: clamp(1rem, 3.8vw, 1.6rem);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: clamp(1.8rem, 6.5vw, 2.8rem);
+      height: clamp(1.8rem, 6.5vw, 2.8rem);
+      border-radius: 50%;
+      transition: all 0.2s ease;
+      background: rgba(60, 50, 90, 0.5);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+      flex-shrink: 0;
+    }
+    .icon-btn:active {
+      background: rgba(140, 120, 200, 0.75);
+      transform: scale(0.88);
+      transition: all 0.08s ease;
+    }
+    .icon-btn.fullscreen-active {
+      background: rgba(160, 140, 220, 0.65);
+      box-shadow: 0 0 16px rgba(180, 150, 240, 0.6);
+    }
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+      pointer-events: auto;
+      padding: 1.5rem;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal-panel {
+      background: #1c162b;
+      border-radius: 2.5rem;
+      padding: clamp(1rem, 3.5vw, 2rem);
+      width: min(90%, 400px);
+      max-width: 95vw;
+      color: #d9d0f0;
+      border: 1px solid rgba(180, 140, 230, 0.5);
+      box-shadow: 0 30px 60px rgba(0,0,0,0.9);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      font-size: clamp(0.85rem, 2.5vw, 1.05rem);
+      animation: slideUp 0.25s ease;
+      max-height: 80vh;
+      max-height: 80dvh;
+      overflow-y: auto;
+    }
+    @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-title {
+      font-size: clamp(1.2rem, 4.5vw, 1.7rem);
+      text-align: center;
+      color: #cfc1f5;
+      font-weight: 400;
+      letter-spacing: 1px;
+    }
+    .modal-body { line-height: 1.6; color: #c5bae0; text-align: center; }
+    .flex-row { display: flex; gap: 0.5rem; align-items: center; justify-content: center; flex-wrap: wrap; }
+    button {
+      background: #2f2648;
+      border: none;
+      color: #e1d7ff;
+      padding: 0.5rem 1.2rem;
+      border-radius: 2.5rem;
+      font-weight: 400;
+      cursor: pointer;
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      font-size: inherit;
+      transition: all 0.2s ease;
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap;
+    }
+    button:active { background: #4a3c6a; transform: scale(0.95); transition: all 0.08s ease; }
+    button.primary-btn { background: #4a3870; border: 1px solid rgba(180,140,230,0.5); font-weight: 500; }
+    button.danger-btn { background: #3d1f2f; border: 1px solid rgba(220,120,140,0.4); }
+    .hidden { display: none !important; }
+    .key-hint {
+      font-size: clamp(0.65rem, 1.8vw, 0.8rem);
+      color: #9a8ec0;
+      text-align: center;
+      letter-spacing: 0.3px;
+      opacity: 0.75;
+      transition: opacity 0.5s ease;
+    }
+
+    /* 针对手机竖屏进一步优化底部导航条自适应 */
+    @media (max-width: 480px) {
+      .bottom-bar {
+        padding: 0.3rem 0.5rem;
+        gap: 0.2rem;
+        border-radius: 2.5rem;
+      }
+      .icon-btn {
+        width: clamp(1.6rem, 7vw, 2.2rem);
+        height: clamp(1.6rem, 7vw, 2.2rem);
+        font-size: clamp(0.9rem, 4vw, 1.3rem);
+      }
+      .progress-area {
+        gap: 0.2rem;
+      }
+      .level-num {
+        font-size: 0.85rem;
+        padding: 0.1rem 0.5rem;
+      }
+      .dots-row {
+        gap: 0.2rem;
+      }
+      .dot-indicator {
+        width: 5px;
+        height: 5px;
+      }
+      .game-title {
+        font-size: 1.2rem;
+        padding: 0.2rem 1rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .bottom-bar {
+        padding: 0.25rem 0.4rem;
+        gap: 0.15rem;
+      }
+      .icon-btn {
+        width: 1.7rem;
+        height: 1.7rem;
+        font-size: 1rem;
+      }
+      .progress-area {
+        gap: 0.15rem;
+      }
+      .level-num {
+        font-size: 0.8rem;
+        padding: 0.1rem 0.4rem;
+        min-width: 1.8em;
+      }
+      .dots-row {
+        gap: 0.15rem;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+      .game-title { font-size: clamp(1rem, 3vh, 1.8rem); padding: 0.2rem 1.2rem; }
+      .bottom-bar { padding: 0.3rem 0.8rem; gap: 0.3rem; }
+      .icon-btn { width: clamp(1.6rem, 5vh, 2.6rem); height: clamp(1.6rem, 5vh, 2.6rem); font-size: clamp(0.9rem, 3vh, 1.5rem); }
+      .ui-layer { padding: 0.3rem 0.6rem; }
+    }
+
+    @media (pointer: coarse) {
+      .icon-btn { min-width: 38px; min-height: 38px; }
+      button { min-height: 38px; padding: 0.45rem 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="game-container" id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
+  <div class="ui-layer">
+    <div class="top-bar">
+      <div class="game-title">Hardopera</div>
+    </div>
+    <div class="bottom-bar" id="bottomBar">
+      <div class="progress-area" id="progressDisplay">
+        <span class="level-num" id="levelLabel">1</span>
+        <div class="dots-row" id="dotsContainer"></div>
+      </div>
+      <div class="icon-group">
+        <button class="icon-btn" id="btnFullscreen" title="全屏">⛶</button>
+        <button class="icon-btn" id="btnTheme" title="色调">🎨</button>
+        <button class="icon-btn" id="btnLevels" title="关卡库">🌌</button>
+        <button class="icon-btn" id="btnTreasury" title="宝库">💎</button>
+        <button class="icon-btn" id="btnSound" title="音量">🔊</button>
+        <button class="icon-btn" id="btnSettings" title="设置">⚙️</button>
+      </div>
+    </div>
+    <div class="key-hint" id="keyHint">⌨️ WASD / 方向键移动光标 &nbsp;|&nbsp; 点击/触摸直接收集</div>
+  </div>
+  <div id="modalContainer" class="hidden"></div>
+</div>
+
+<script>
+  (function() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('gameContainer');
+    const modalContainer = document.getElementById('modalContainer');
+    const keyHint = document.getElementById('keyHint');
+
+    const TOTAL_FRAGMENTS = 5;
+    const MAX_DPR = 2;
+    let currentLevel = 1;
+    let fragmentsCollected = 0;
+    let cursor = { x: 0.5, y: 0.5 };
+    let fragments = [];
+    let collectedArt = [];
+    let giftBox = null;
+    let levelTransition = null;
+    let muted = false;
+    let isFullscreen = false;
+    let displayWidth = 0;
+    let displayHeight = 0;
+    let dpr = 1;
+    let themeIndex = 0;
+    const themes = [
+      'radial-gradient(circle at 20% 20%, #2a1f3a, #110b22)',
+      'radial-gradient(circle at 20% 20%, #3a2520, #1c100c)',
+      'radial-gradient(circle at 20% 20%, #1f3022, #0c1510)',
+      'radial-gradient(circle at 20% 20%, #1f2530, #0c1018)',
+      'radial-gradient(circle at 20% 20%, #2d1f30, #140c18)',
+    ];
+    const themeBoxShadows = [
+      'inset 0 0 80px rgba(140, 100, 210, 0.3)',
+      'inset 0 0 80px rgba(220, 140, 90, 0.3)',
+      'inset 0 0 80px rgba(90, 180, 120, 0.3)',
+      'inset 0 0 80px rgba(100, 140, 200, 0.3)',
+      'inset 0 0 80px rgba(160, 100, 190, 0.3)',
+    ];
+
+    let audioCtx = null;
+    let animFrameId = null;
+    let lastFrameTime = 0;
+    let keysPressed = {};
+    let isTouchDragging = false;
+
+    function initAudio() {
+      if (audioCtx) return;
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {}
+    }
+
+    function playTone(freq = 800, type = 'sine', duration = 0.15, vol = 0.2) {
+      if (!audioCtx || muted) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(Math.min(vol, 0.35), audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playCollectSound() {
+      const notes = [1047, 1175, 1319, 1397, 1568, 880, 988];
+      playTone(notes[Math.floor(Math.random() * notes.length)], 'sine', 0.14, 0.22);
+    }
+
+    function playGiftSound() {
+      playTone(660, 'triangle', 0.1, 0.3);
+      setTimeout(() => playTone(880, 'triangle', 0.12, 0.28), 100);
+      setTimeout(() => playTone(1100, 'triangle', 0.15, 0.25), 200);
+    }
+
+    function playLevelCompleteSound() {
+      playTone(523, 'sine', 0.2, 0.25);
+      setTimeout(() => playTone(659, 'sine', 0.2, 0.25), 150);
+      setTimeout(() => playTone(784, 'sine', 0.3, 0.3), 300);
+    }
+
+    function getDPR() {
+      return Math.min(window.devicePixelRatio || 1, MAX_DPR);
+    }
+
+    function resizeCanvas() {
+      const rect = container.getBoundingClientRect();
+      displayWidth = rect.width || window.innerWidth;
+      displayHeight = rect.height || window.innerHeight;
+      dpr = getDPR();
+      canvas.width = Math.floor(displayWidth * dpr);
+      canvas.height = Math.floor(displayHeight * dpr);
+      canvas.style.width = displayWidth + 'px';
+      canvas.style.height = displayHeight + 'px';
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      updateFragmentDisplayRadii();
+    }
+
+    function updateFragmentDisplayRadii() {
+      const base = Math.min(displayWidth, displayHeight);
+      fragments.forEach(f => {
+        f.displayRadius = f.relativeRadius * base;
+        f.displayRadius = Math.max(f.displayRadius, 5);
+        f.displayRadius = Math.min(f.displayRadius, 40);
+      });
+      if (giftBox) {
+        giftBox.displayRadius = giftBox.relativeRadius * base;
+        giftBox.displayRadius = Math.max(giftBox.displayRadius, 10);
+        giftBox.displayRadius = Math.min(giftBox.displayRadius, 50);
+      }
+    }
+
+    function generateFragments() {
+      fragments = [];
+      const base = Math.min(displayWidth || window.innerWidth, displayHeight || window.innerHeight);
+      for (let i = 0; i < TOTAL_FRAGMENTS; i++) {
+        const relativeRadius = 0.014 + Math.random() * 0.024;
+        fragments.push({
+          x: 0.18 + Math.random() * 0.64,
+          y: 0.18 + Math.random() * 0.64,
+          relativeRadius: relativeRadius,
+          displayRadius: relativeRadius * base,
+          collected: false,
+          hue: Math.random() * 360,
+          pulse: Math.random() * Math.PI * 2,
+        });
+      }
+      giftBox = null;
+      fragmentsCollected = 0;
+      updateFragmentDisplayRadii();
+      updateProgressUI();
+    }
+
+    function maybeSpawnGiftBox() {
+      if (Math.random() < 0.28 && !giftBox && fragments.filter(f => !f.collected).length > 0) {
+        const base = Math.min(displayWidth, displayHeight);
+        const relativeRadius = 0.028 + Math.random() * 0.022;
+        giftBox = {
+          x: 0.22 + Math.random() * 0.56,
+          y: 0.22 + Math.random() * 0.56,
+          relativeRadius: relativeRadius,
+          displayRadius: relativeRadius * base,
+          opened: false,
+          sparkle: 0,
+        };
+        updateFragmentDisplayRadii();
+      }
+    }
+
+    function openGiftBox() {
+      if (!giftBox || giftBox.opened) return;
+      giftBox.opened = true;
+      playGiftSound();
+      const remaining = fragments.filter(f => !f.collected);
+      const r = Math.random();
+      if (r < 0.4 && remaining.length > 0) {
+        let delay = 0;
+        remaining.forEach(frag => {
+          setTimeout(() => {
+            if (frag.collected) return;
+            frag.collected = true;
+            fragmentsCollected++;
+            playCollectSound();
+            updateProgressUI();
+            if (fragmentsCollected >= TOTAL_FRAGMENTS) triggerLevelComplete();
+            updateFragmentDisplayRadii();
+          }, delay);
+          delay += 260;
+        });
+      } else if (r < 0.7) {
+        const add = Math.min(3, TOTAL_FRAGMENTS - fragments.length);
+        const base = Math.min(displayWidth, displayHeight);
+        for (let i = 0; i < add; i++) {
+          const relRad = 0.014 + Math.random() * 0.02;
+          fragments.push({
+            x: 0.15 + Math.random() * 0.7,
+            y: 0.15 + Math.random() * 0.7,
+            relativeRadius: relRad,
+            displayRadius: relRad * base,
+            collected: false,
+            hue: Math.random() * 360,
+            pulse: Math.random() * Math.PI * 2,
+          });
+        }
+        updateFragmentDisplayRadii();
+      } else {
+        const removeCount = Math.min(3, remaining.length);
+        for (let i = 0; i < removeCount; i++) {
+          if (remaining[i] && !remaining[i].collected) {
+            remaining[i].collected = true;
+            fragmentsCollected++;
+          }
+        }
+        updateProgressUI();
+        if (fragmentsCollected >= TOTAL_FRAGMENTS) triggerLevelComplete();
+      }
+      giftBox = null;
+    }
+
+    function collectFragment(frag) {
+      if (frag.collected) return;
+      frag.collected = true;
+      fragmentsCollected++;
+      playCollectSound();
+      collectedArt.push({ hue: frag.hue, level: currentLevel, timestamp: Date.now() });
+      updateProgressUI();
+      if (fragmentsCollected >= TOTAL_FRAGMENTS) triggerLevelComplete();
+      maybeSpawnGiftBox();
+    }
+
+    function triggerLevelComplete() {
+      if (levelTransition) return;
+      playLevelCompleteSound();
+      levelTransition = { phase: 'showNumber', timer: 0, nextLevel: currentLevel + 1 };
+    }
+
+    function advanceLevel() {
+      currentLevel++;
+      fragmentsCollected = 0;
+      collectedArt = collectedArt.filter(a => a.level !== currentLevel);
+      generateFragments();
+      levelTransition = null;
+      updateProgressUI();
+    }
+
+    function updateProgressUI() {
+      document.getElementById('levelLabel').innerText = currentLevel;
+      const dotsDiv = document.getElementById('dotsContainer');
+      if (!dotsDiv) return;
+      dotsDiv.innerHTML = '';
+      for (let i = 0; i < TOTAL_FRAGMENTS; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot-indicator' + (i < fragmentsCollected ? ' collected' : '');
+        dotsDiv.appendChild(dot);
+      }
+    }
+
+    function drawFractalBackground(timestamp) {
+      const w = displayWidth, h = displayHeight;
+      if (w <= 0 || h <= 0) return;
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      const tNorm = timestamp * 0.0001;
+      const hueShift = Math.sin(tNorm * 0.3) * 12;
+      // 提高背景亮度：原来12%,8%,5% → 22%,18%,14%
+      grad.addColorStop(0, `hsl(${255 + hueShift}, 45%, 22%)`);
+      grad.addColorStop(0.5, `hsl(${265 + hueShift}, 40%, 18%)`);
+      grad.addColorStop(1, `hsl(${250 + hueShift}, 35%, 14%)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      // 增加线条数量和色彩变化
+      const lineCount = Math.min(22, Math.max(12, Math.floor(w / 65)));
+      for (let i = 0; i < lineCount; i++) {
+        ctx.beginPath();
+        const alpha = 0.15 + 0.12 * Math.sin(timestamp * 0.0003 + i);
+        ctx.strokeStyle = `hsla(${255 + i * 8 + hueShift}, 70%, 75%, ${alpha})`;
+        ctx.lineWidth = 1.2 + 0.7 * Math.sin(timestamp * 0.0006 + i * 1.3);
+        let x = w * (0.28 + 0.44 * Math.sin(timestamp * 0.0004 + i * 1.1));
+        let y = h * (0.35 + 0.35 * Math.cos(timestamp * 0.00055 + i * 0.9));
+        ctx.moveTo(x, y);
+        const segments = 4 + Math.floor(Math.abs(Math.sin(i * 0.7)) * 4);
+        for (let j = 0; j < segments; j++) {
+          const angle = j * 1.7 + i * 0.8 + timestamp * 0.0002;
+          const dist = 18 + Math.sin(j * 2.1 + i) * 14;
+          x += Math.sin(angle) * dist;
+          y += Math.cos(angle * 0.8) * dist;
+          ctx.lineTo(Math.max(0, Math.min(w, x)), Math.max(0, Math.min(h, y)));
+        }
+        ctx.stroke();
+      }
+    }
+
+    function drawGame(timestamp) {
+      if (!displayWidth || !displayHeight) resizeCanvas();
+      if (displayWidth <= 0 || displayHeight <= 0) return;
+      const w = displayWidth, h = displayHeight;
+      ctx.clearRect(0, 0, w, h);
+      drawFractalBackground(timestamp);
+
+      // 绘制碎片（光晕半径加大，色彩层次增加）
+      fragments.forEach(f => {
+        if (f.collected) return;
+        const fx = f.x * w, fy = f.y * h;
+        const radius = f.displayRadius || (f.relativeRadius * Math.min(w, h));
+        const pulse = 1 + 0.15 * Math.sin(timestamp * 0.004 + f.pulse);
+        // 光晕半径从1.8倍提升至2.8倍
+        const glowRadius = radius * pulse * 2.8;
+        ctx.beginPath();
+        ctx.arc(fx, fy, glowRadius, 0, Math.PI * 2);
+        const glowGrad = ctx.createRadialGradient(fx, fy, radius * 0.2, fx, fy, glowRadius);
+        glowGrad.addColorStop(0, `hsla(${f.hue}, 95%, 80%, 0.55)`);
+        glowGrad.addColorStop(0.4, `hsla(${f.hue}, 90%, 70%, 0.35)`);
+        glowGrad.addColorStop(1, `hsla(${f.hue}, 85%, 55%, 0)`);
+        ctx.fillStyle = glowGrad;
+        ctx.fill();
+
+        // 碎片主体
+        ctx.beginPath();
+        ctx.arc(fx, fy, radius * pulse, 0, Math.PI * 2);
+        const bodyGrad = ctx.createRadialGradient(fx - radius * 0.25, fy - radius * 0.25, radius * 0.1, fx, fy, radius * pulse);
+        bodyGrad.addColorStop(0, `hsla(${f.hue}, 80%, 92%, 0.95)`);
+        bodyGrad.addColorStop(0.5, `hsla(${f.hue}, 85%, 75%, 0.85)`);
+        bodyGrad.addColorStop(1, `hsla(${f.hue}, 80%, 50%, 0.75)`);
+        ctx.fillStyle = bodyGrad;
+        ctx.shadowColor = `hsl(${f.hue}, 90%, 65%)`;
+        ctx.shadowBlur = 20 * pulse;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+
+      // 绘制礼物盒（光晕半径加大）
+      if (giftBox && !giftBox.opened) {
+        const gx = giftBox.x * w, gy = giftBox.y * h;
+        const gradius = giftBox.displayRadius || (giftBox.relativeRadius * Math.min(w, h));
+        const bounce = 1 + 0.06 * Math.sin(timestamp * 0.005 + (giftBox.sparkle || 0));
+        const glowRadius = gradius * bounce * 3.0;
+        ctx.beginPath();
+        ctx.arc(gx, gy, glowRadius, 0, Math.PI * 2);
+        const giftGlow = ctx.createRadialGradient(gx, gy, gradius * 0.3, gx, gy, glowRadius);
+        giftGlow.addColorStop(0, 'rgba(255,230,120,0.6)');
+        giftGlow.addColorStop(0.5, 'rgba(255,200,80,0.3)');
+        giftGlow.addColorStop(1, 'rgba(255,160,30,0)');
+        ctx.fillStyle = giftGlow;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(gx, gy, gradius * bounce, 0, Math.PI * 2);
+        const giftBodyGrad = ctx.createRadialGradient(gx - gradius * 0.2, gy - gradius * 0.3, gradius * 0.08, gx, gy, gradius * bounce);
+        giftBodyGrad.addColorStop(0, '#fffbe6');
+        giftBodyGrad.addColorStop(0.4, '#f9dc5c');
+        giftBodyGrad.addColorStop(1, '#c89020');
+        ctx.fillStyle = giftBodyGrad;
+        ctx.shadowColor = '#ffc840';
+        ctx.shadowBlur = 26;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        const bowSize = gradius * 0.55;
+        ctx.fillStyle = '#eaa0a0';
+        ctx.beginPath(); ctx.arc(gx - bowSize, gy - gradius * 0.5, bowSize * 0.7, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(gx + bowSize, gy - gradius * 0.5, bowSize * 0.7, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f2c0c0';
+        ctx.beginPath(); ctx.arc(gx, gy - gradius * 0.6, bowSize * 0.45, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // 关卡过渡
+      if (levelTransition) {
+        const alpha = Math.min(0.7, levelTransition.timer / 50);
+        ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+        ctx.fillRect(0, 0, w, h);
+        ctx.font = `bold ${Math.floor(Math.min(w, h) / 4.5)}px "Segoe UI", system-ui, sans-serif`;
+        ctx.fillStyle = '#f0e6ff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(180,140,240,0.8)';
+        ctx.shadowBlur = 30;
+        ctx.fillText(levelTransition.nextLevel, w / 2, h / 2);
+        ctx.shadowBlur = 0;
+        ctx.textBaseline = 'alphabetic';
+        levelTransition.timer++;
+        if (levelTransition.timer > 70) advanceLevel();
+      }
+    }
+
+    function checkCursorProximityCollection() {
+      if (levelTransition) return;
+      if (giftBox && !giftBox.opened) {
+        const dist = Math.hypot(cursor.x - giftBox.x, cursor.y - giftBox.y);
+        const threshold = (giftBox.displayRadius / Math.min(displayWidth, displayHeight)) + 0.03;
+        if (dist < Math.max(threshold, 0.06)) {
+          openGiftBox();
+          return;
+        }
+      }
+      for (let f of fragments) {
+        if (f.collected) continue;
+        const dist = Math.hypot(cursor.x - f.x, cursor.y - f.y);
+        const threshold = (f.displayRadius / Math.min(displayWidth, displayHeight)) + 0.025;
+        if (dist < Math.max(threshold, 0.04)) {
+          collectFragment(f);
+          return;
+        }
+      }
+    }
+
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+      const scaleX = displayWidth / (rect.width || displayWidth);
+      const scaleY = displayHeight / (rect.height || displayHeight);
+      const nx = ((clientX - rect.left) * scaleX) / displayWidth;
+      const ny = ((clientY - rect.top) * scaleY) / displayHeight;
+      return { nx: Math.max(0, Math.min(1, nx)), ny: Math.max(0, Math.min(1, ny)) };
+    }
+
+    function handleCanvasInteraction(e) {
+      if (levelTransition) return;
+      initAudio();
+      const { nx, ny } = getCanvasCoords(e);
+      cursor.x = nx;
+      cursor.y = ny;
+      checkCursorProximityCollection();
+    }
+
+    canvas.addEventListener('click', (e) => handleCanvasInteraction(e));
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      isTouchDragging = true;
+      const touch = e.touches[0];
+      if (touch) handleCanvasInteraction(touch);
+    }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!isTouchDragging || levelTransition) return;
+      const touch = e.touches[0];
+      if (touch) {
+        initAudio();
+        const { nx, ny } = getCanvasCoords(touch);
+        cursor.x = nx;
+        cursor.y = ny;
+        checkCursorProximityCollection();
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchend', (e) => { e.preventDefault(); isTouchDragging = false; }, { passive: false });
+    canvas.addEventListener('touchcancel', () => { isTouchDragging = false; });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+      keysPressed[e.code] = true;
+      if (!levelTransition) initAudio();
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        if (!levelTransition) checkCursorProximityCollection();
+      }
+    });
+    window.addEventListener('keyup', (e) => { keysPressed[e.code] = false; });
+
+    window.addEventListener('resize', () => { resizeCanvas(); updateFragmentDisplayRadii(); });
+    window.addEventListener('orientationchange', () => { setTimeout(() => { resizeCanvas(); updateFragmentDisplayRadii(); }, 300); });
+
+    document.addEventListener('fullscreenchange', updateFullscreenState);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenState);
+    document.addEventListener('mozfullscreenchange', updateFullscreenState);
+    document.addEventListener('MSFullscreenChange', updateFullscreenState);
+
+    function updateFullscreenState() {
+      isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+      const btn = document.getElementById('btnFullscreen');
+      if (btn) {
+        btn.innerText = isFullscreen ? '⛶' : '⛶';
+        btn.classList.toggle('fullscreen-active', isFullscreen);
+      }
+    }
+
+    function toggleFullscreen() {
+      if (isFullscreen) {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+        else if (document.msExitFullscreen) document.msExitFullscreen();
+      } else {
+        const el = container;
+        (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen || function(){})
+          .call(el).catch(() => {
+            container.style.position = 'fixed'; container.style.top = '0'; container.style.left = '0';
+            container.style.width = '100vw'; container.style.height = '100vh'; container.style.zIndex = '9999';
+            isFullscreen = true; updateFullscreenState(); setTimeout(resizeCanvas, 100);
+          });
+      }
+    }
+
+    function showModal(title, content, buttons = []) {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `<div class="modal-panel"><div class="modal-title">${title}</div><div class="modal-body">${content}</div><div class="flex-row">${buttons.map((b,i) => `<button class="${b.primary?'primary-btn':''} ${b.danger?'danger-btn':''}" data-index="${i}">${b.label}</button>`).join('')}</div></div>`;
+      modalContainer.innerHTML = '';
+      modalContainer.className = '';
+      modalContainer.appendChild(overlay);
+      overlay.querySelectorAll('button').forEach((btn, i) => {
+        btn.addEventListener('click', () => { if (buttons[i]?.callback) buttons[i].callback(); closeModal(); });
+      });
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    }
+
+    function closeModal() { modalContainer.innerHTML = ''; modalContainer.className = 'hidden'; }
+
+    document.getElementById('btnFullscreen').addEventListener('click', () => { initAudio(); toggleFullscreen(); });
+    document.getElementById('btnSound').addEventListener('click', () => {
+      initAudio(); muted = !muted;
+      document.getElementById('btnSound').innerText = muted ? '🔇' : '🔊';
+      if (!muted && audioCtx?.state === 'suspended') audioCtx.resume();
+    });
+    document.getElementById('btnTheme').addEventListener('click', () => {
+      initAudio(); themeIndex = (themeIndex + 1) % themes.length;
+      container.style.background = themes[themeIndex];
+      container.style.boxShadow = themeBoxShadows[themeIndex];
+      playTone(440 + themeIndex * 60, 'sine', 0.1, 0.15);
+    });
+    document.getElementById('btnLevels').addEventListener('click', () => {
+      initAudio();
+      showModal('🌌 关卡库', `当前位于 <strong>第 ${currentLevel} 关</strong><br><br>已解锁维度：<strong>${currentLevel}</strong> 个<br>可随时重温已解锁的关卡维度。<br><small style="color:#887faa;">收集全部碎片以推进到下一关</small>`, [
+        { label: '知道了', primary: true, callback: () => {} }
+      ]);
+    });
+    document.getElementById('btnTreasury').addEventListener('click', () => {
+      initAudio();
+      const total = collectedArt.length;
+      const uniqueHues = new Set(collectedArt.map(a => Math.round(a.hue/30)*30)).size;
+      showModal('💎 分形宝库', `已收藏 <strong>${total}</strong> 个分形艺术碎片<br>色彩种类：<strong>${uniqueHues}</strong> 种<br><br><small style="color:#887faa;">碎片来自各关卡收集<br>每关可重新收集</small>`, [
+        { label: '继续探索', primary: true, callback: () => {} },
+        { label: '清空宝库', danger: true, callback: () => { collectedArt = []; showModal('💎 宝库已清空', '所有收藏的碎片已被释放回维度中。', [{ label: '好的', primary: true, callback: () => {} }]); } }
+      ]);
+    });
+    document.getElementById('btnSettings').addEventListener('click', () => {
+      initAudio();
+      showModal('⚙️ 设置', `当前关卡：<strong>${currentLevel}</strong> &nbsp;|&nbsp; 碎片进度：<strong>${fragmentsCollected}/${TOTAL_FRAGMENTS}</strong><br><br><small style="color:#887faa;">⌨️ 键盘：WASD/方向键移动隐形光标，空格收集<br>📱 移动端：点击或滑动直接收集</small>`, [
+        { label: isFullscreen ? '退出全屏' : '进入全屏', callback: () => toggleFullscreen() },
+        { label: muted ? '🔇 取消静音' : '🔊 静音', callback: () => { muted = !muted; document.getElementById('btnSound').innerText = muted ? '🔇' : '🔊'; if (!muted && audioCtx?.state === 'suspended') audioCtx.resume(); } },
+        { label: '关闭', primary: true, callback: () => {} }
+      ]);
+    });
+
+    window.addEventListener('keydown', (e) => { if (e.code === 'Escape' && modalContainer.innerHTML) closeModal(); });
+
+    setTimeout(() => { if (keyHint) { keyHint.style.opacity = '0'; setTimeout(() => { if (keyHint) keyHint.style.transition = 'opacity 0.5s ease'; }, 600); } }, 8000);
+    canvas.addEventListener('touchstart', () => {
+      if (keyHint && keyHint.style.opacity === '0') {
+        keyHint.style.opacity = '0.8';
+        clearTimeout(keyHint._timeout);
+        keyHint._timeout = setTimeout(() => { keyHint.style.opacity = '0'; }, 4000);
+      }
+    }, { once: false });
+
+    function gameLoop(timestamp) {
+      if (!lastFrameTime) lastFrameTime = timestamp;
+      lastFrameTime = timestamp;
+      if (!levelTransition && Object.keys(keysPressed).length > 0) {
+        const moveSpeed = 0.022;
+        let dx = 0, dy = 0;
+        if (keysPressed['KeyW'] || keysPressed['ArrowUp']) dy -= moveSpeed;
+        if (keysPressed['KeyS'] || keysPressed['ArrowDown']) dy += moveSpeed;
+        if (keysPressed['KeyA'] || keysPressed['ArrowLeft']) dx -= moveSpeed;
+        if (keysPressed['KeyD'] || keysPressed['ArrowRight']) dx += moveSpeed;
+        if (dx !== 0 || dy !== 0) {
+          const len = Math.sqrt(dx*dx+dy*dy);
+          if (len > moveSpeed) { dx = dx/len*moveSpeed; dy = dy/len*moveSpeed; }
+          cursor.x = Math.max(0.02, Math.min(0.98, cursor.x + dx));
+          cursor.y = Math.max(0.02, Math.min(0.98, cursor.y + dy));
+          checkCursorProximityCollection();
+        }
+      }
+      drawGame(timestamp);
+      animFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function startGame() {
+      resizeCanvas();
+      generateFragments();
+      updateProgressUI();
+      updateFullscreenState();
+      lastFrameTime = performance.now();
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      animFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) lastFrameTime = 0;
+      else { lastFrameTime = performance.now(); if (audioCtx?.state === 'suspended') audioCtx.resume(); }
+    });
+    window.addEventListener('load', startGame);
+    document.addEventListener('gesturestart', (e) => { if (e.target.closest('.game-container')) e.preventDefault(); });
+    document.addEventListener('gesturechange', (e) => { if (e.target.closest('.game-container')) e.preventDefault(); });
+    document.addEventListener('gestureend', (e) => { if (e.target.closest('.game-container')) e.preventDefault(); });
+  })();
+</script>
+</body>
+</html>

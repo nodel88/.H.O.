@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>分形漫游 · 灵触净界 · Hardopera</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #050010;
+            touch-action: none;
+        }
+        #game-world {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #050010;
+            cursor: default;   /* 正常鼠标，不隐藏 */
+        }
+        .fractal-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #background-canvas { z-index: 1; filter: blur(36px); }
+        #mid-canvas { z-index: 2; mix-blend-mode: color-dodge; opacity: 0.5; }
+        #game-canvas { z-index: 3; }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .ui-overlay > * { pointer-events: auto; }
+        
+        .game-title-header {
+            position: absolute;
+            top: 32px; left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 26px;
+            font-weight: 700;
+            color: #cccccc;
+            letter-spacing: 6px;
+            text-align: center;
+            white-space: nowrap;
+            z-index: 500;
+            text-shadow: 0 0 8px rgba(255,255,255,0.2);
+            pointer-events: none;
+        }
+        
+        /* 底部导航条：完全透明无边框无圆角 */
+        .ui-bottom-bar {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: transparent;
+            backdrop-filter: none;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+            z-index: 100;
+            pointer-events: auto;
+        }
+        /* 每个图标按钮保留轻微半透底，便于点击识别 */
+        .bottom-control {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(6px);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.85;
+        }
+        .bottom-control:hover { opacity: 1; transform: scale(1.05); background: rgba(0,0,0,0.8); }
+        .bottom-control svg { width: 24px; height: 24px; stroke: #cccccc; stroke-width: 1.8; fill: none; }
+        
+        /* 进度容器：关卡数字在左，小圆点紧靠右侧 */
+        .progress-wrapper {
+            display: flex;
+            align-items: center;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(6px);
+            border-radius: 40px;
+            padding: 8px 18px;
+            gap: 12px;
+        }
+        .level-stats {
+            font-family: 'Orbitron', monospace;
+            font-size: 22px;
+            color: #dddddd;
+            font-weight: 600;
+        }
+        .progress-dots {
+            display: flex;
+            gap: 6px;
+        }
+        .progress-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            transition: all 0.2s;
+        }
+        .progress-dot.filled {
+            background: #dddddd;
+            box-shadow: 0 0 8px #cccccc;
+            border-color: #ffffff;
+        }
+        
+        /* 模态框通用 */
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(16px);
+            display: flex;
+            opacity: 0;
+            visibility: hidden;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            pointer-events: none;
+        }
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+        .modal-card {
+            background: rgba(10, 5, 20, 0.96);
+            border: 1px solid rgba(204,204,204,0.25);
+            border-radius: 32px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            transform: translateY(24px);
+            transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .modal-overlay.visible .modal-card { transform: translateY(0); }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 28px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-header h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            color: #cccccc;
+            letter-spacing: 2px;
+        }
+        .close-btn {
+            font-size: 40px;
+            line-height: 1;
+            cursor: pointer;
+            color: #aaa;
+            transition: 0.2s;
+        }
+        .close-btn:hover { color: #fff; }
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+            color: #eee;
+        }
+        /* 宝库网格：每个分形卡片四周留白充足，显示完整 */
+        .treasury-grid {
+            display: grid;
+            gap: 24px;
+            margin-top: 16px;
+        }
+        .treasury-grid.cols-2 { grid-template-columns: repeat(2,1fr); }
+        .treasury-grid.cols-5 { grid-template-columns: repeat(5,1fr); }
+        .treasury-grid.cols-10 { grid-template-columns: repeat(10,1fr); }
+        .fractal-item {
+            aspect-ratio: 1;
+            background: #0a0a12;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .fractal-item canvas { width: 100%; height: 100%; object-fit: contain; }
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px,1fr));
+            gap: 16px;
+        }
+        .level-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 24px;
+            text-align: center;
+            padding: 20px 8px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .level-card.locked { opacity: 0.4; filter: grayscale(0.4); cursor: not-allowed; }
+        .level-card.current { border: 2px solid #cccccc; background: rgba(204,204,204,0.1); }
+        .level-num { font-family: 'Orbitron'; font-size: 36px; color: #fff; }
+        
+        /* 全屏放大图层 */
+        .fullscreen-zoom {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.98);
+            z-index: 300;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            cursor: pointer;
+        }
+        .fullscreen-zoom.visible { display: flex; }
+        .fullscreen-canvas {
+            max-width: 85vw;
+            max-height: 85vh;
+            background: #000;
+            border-radius: 28px;
+            box-shadow: 0 0 60px rgba(255,255,255,0.1);
+        }
+        
+        .continue-modal {
+            background: transparent;
+            text-align: center;
+        }
+        .continue-level {
+            font-family: 'Orbitron';
+            font-size: 140px;
+            color: white;
+            text-shadow: 0 0 30px rgba(255,255,255,0.4);
+        }
+        .audio-slider-group {
+            margin-bottom: 28px;
+        }
+        input[type="range"] { width: 100%; height: 6px; -webkit-appearance: none; background: #333; border-radius: 3px; }
+        input[type="range"]:focus { outline: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: #cccccc; border-radius: 50%; cursor: pointer; }
+        .view-mode-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 30px;
+            color: #ccc;
+            font-family: monospace;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .view-mode-btn.active { background: #cccccc22; border: 1px solid #ccc; color: white; }
+        @media (max-width: 600px) {
+            .bottom-control { width: 40px; height: 40px; }
+            .game-title-header { font-size: 18px; top: 16px; letter-spacing: 3px; }
+            .progress-wrapper { padding: 4px 12px; }
+            .level-stats { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+<div id="game-world">
+    <canvas id="background-canvas" class="fractal-layer"></canvas>
+    <canvas id="mid-canvas" class="fractal-layer"></canvas>
+    <canvas id="game-canvas" class="fractal-layer"></canvas>
+    <div class="ui-overlay">
+        <div class="game-title-header">✨ HARDIOPERA · 灵触净界 ✨</div>
+        <div class="ui-bottom-bar">
+            <div class="bottom-control" id="theme-trigger"><svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg></div>
+            <div class="bottom-control" id="level-library-trigger"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+            <div class="bottom-control" id="treasury-trigger"><svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+            <div class="progress-wrapper">
+                <div class="level-stats" id="level-stats">1</div>
+                <div class="progress-dots" id="progress-dots-container"></div>
+            </div>
+            <div class="bottom-control" id="mute-toggle"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></div>
+            <div class="bottom-control" id="leaderboard-trigger"><svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></div>
+            <div class="bottom-control" id="version-trigger"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+        </div>
+        <!-- 模态框（功能正常） -->
+        <div id="version-modal" class="modal-overlay"><div class="modal-card"><div class="modal-header"><h2>漫游手记</h2><div class="close-btn version-close">&times;</div></div><div class="modal-body"><div class="modal-tabs"><div class="modal-tab active" data-tab="intro">✨ 灵境</div><div class="modal-tab" data-tab="log">📜 演进诗篇</div></div><div id="intro-tab" class="tab-content active"><div id="intro-text"></div></div><div id="log-tab" class="tab-content"><div id="log-list"></div></div></div></div></div>
+        <div id="treasury-modal" class="modal-overlay"><div class="modal-card"><div class="modal-header"><h2>📦 分形宝库</h2><div><button class="view-mode-btn" data-cols="2">2列</button><button class="view-mode-btn" data-cols="5">5列</button><button class="view-mode-btn" data-cols="10">10列</button></div><div class="close-btn treasury-close">&times;</div></div><div class="modal-body"><div id="treasury-grid"></div></div></div></div>
+        <div id="level-lib-modal" class="modal-overlay"><div class="modal-card"><div class="modal-header"><h2>🌀 维度之门</h2><div class="close-btn level-lib-close">&times;</div></div><div class="modal-body"><div id="level-grid"></div></div></div></div>
+        <div id="audio-modal" class="modal-overlay"><div class="modal-card"><div class="modal-header"><h2>🎵 韵律共鸣</h2><div class="close-btn audio-close">&times;</div></div><div class="modal-body"><div class="audio-slider-group"><label>🎼 灵境弦音 <span id="music-val">50%</span></label><input type="range" id="music-slider" min="0" max="100" value="50"><div><button id="music-mute-btn" style="background:none;border:1px solid #ccc;padding:6px 16px;border-radius:30px;color:#ccc;">静音/恢复</button></div></div><div class="audio-slider-group"><label>💎 碎晶回响 <span id="sfx-val">50%</span></label><input type="range" id="sfx-slider" min="0" max="100" value="50"><div><button id="sfx-mute-btn" style="background:none;border:1px solid #ccc;padding:6px 16px;border-radius:30px;color:#ccc;">静音/恢复</button></div></div></div></div></div>
+        <div id="theme-modal" class="modal-overlay"><div class="modal-card"><div class="modal-header"><h2>🎨 色调羽衣</h2><div class="close-btn theme-close">&times;</div></div><div class="modal-body"><div id="theme-options" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"></div></div></div></div>
+        <div id="leaderboard-modal" class="modal-overlay"><div class="modal-card"><div class="modal-header"><h2>🏆 星穹榜</h2><div class="close-btn leaderboard-close">&times;</div></div><div class="modal-body"><div id="leaderboard-list"></div></div></div></div>
+        <div id="continue-modal" class="modal-overlay"><div class="modal-card continue-modal" style="background:transparent;border:none;"><div style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px);border-radius:48px;padding:32px;"><div class="continue-level" id="saved-level-num">1</div><p style="font-size:20px;margin:20px 0;">✨ 意识共鸣 · 以太余韵 ✨</p><div style="display:flex;gap:16px;justify-content:center;"><button id="continue-confirm" style="background:#cccccc22;border:1px solid #ccc;padding:12px 28px;border-radius:60px;color:white;">继续游曳</button><button id="restart-confirm" style="background:#ff006622;border:1px solid #ff66aa;padding:12px 28px;border-radius:60px;color:#ffbbdd;">破碎新生</button></div></div></div></div>
+        <!-- 全屏放大图层 -->
+        <div id="fullscreen-zoom" class="fullscreen-zoom"><canvas id="fullscreen-canvas" class="fullscreen-canvas"></canvas></div>
+    </div>
+</div>
+<script>
+    // ---------- 模拟 Astrocade lib ----------
+    const ASSET_MAP = {
+        "player_character": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/images/player_character_e0ed7bee-b8b5-4bc1-a385-02924bddd83a.webp", type: "image" },
+        "art_fragment_1": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/images/art_fragment_1_f9a564da-5956-4d18-ad75-448e59d994dc.webp", type: "image" },
+        "art_fragment_2": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/images/art_fragment_2_2059b668-fbb6-4a8c-a196-1eeb1404c64f.webp", type: "image" },
+        "art_fragment_3": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/images/art_fragment_3_88986540-cff9-4ef0-b377-c870b87ee039.webp", type: "image" },
+        "ambient_music": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/sounds/effect/ambient_music_500cdb0d-1401-462a-8d96-699521785027.mp3", type: "audio" },
+        "bg_music_lv2": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/sounds/effect/bg_music_lv2_bd37ca63-612c-4d54-960f-6a107f522811.mp3", type: "audio" },
+        "bg_music_lv3": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/sounds/effect/bg_music_lv3_b4b3bc6a-1608-4365-bbba-71c34a3aac9d.mp3", type: "audio" },
+        "bg_music_lv4": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/sounds/effect/bg_music_lv4_8d804857-6d34-4a89-8ce4-38d462f79bd3.mp3", type: "audio" },
+        "bg_music_lv5": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/sounds/effect/bg_music_lv5_2f5edc3d-0987-4e05-a3b0-2fd942d0d7d9.mp3", type: "audio" },
+        "wind_chime_1": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/sounds/effect/wind_chime_1_a7ad9658-db3e-4b08-b78b-6a93e560ed52.mp3", type: "audio" },
+        "completion_sfx": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/sounds/effect/completion_sfx_0b89ff30-4250-47ab-8f6b-e11e0b40a411.mp3", type: "audio" },
+        "ui_click_sfx": { url: "https://d2oir5eh8rty2e.cloudfront.net/assets/sounds/effect/ui_click_sfx_178bed51-274c-4b9b-8a60-2860540f5898.mp3", type: "audio" }
+    };
+    window.lib = {
+        getAsset: (id) => ASSET_MAP[id],
+        log: (msg) => console.log("[GAME]", msg),
+        showGameParameters: () => {},
+        shouldUseTouchControls: () => 'ontouchstart' in window,
+        addPlayerScoreToLeaderboard: async (score) => { let lb = JSON.parse(localStorage.getItem("fractal_lb")||"[]"); lb.push({username:"灵迹旅者",score:score,date:Date.now()}); lb.sort((a,b)=>b.score-a.score); localStorage.setItem("fractal_lb",JSON.stringify(lb.slice(0,10))); return {success:true}; },
+        getTopNEntriesFromLeaderboard: async (n=10) => { let lb=JSON.parse(localStorage.getItem("fractal_lb")||"[]"); return {entries:lb.slice(0,n)}; },
+        saveUserGameState: async (state) => { localStorage.setItem("game_save",JSON.stringify(state)); return {success:true,state}; },
+        getUserGameState: async () => { let raw=localStorage.getItem("game_save"); return {state: raw ? JSON.parse(raw) : null}; },
+        deleteUserGameState: async () => { localStorage.removeItem("game_save"); return {success:true}; }
+    };
+    window.gameConfig = {
+        colorPalette: "cosmic_purple", animationSpeed: 1, worldSize: "medium", numFragments: 6,
+        playerSpeed: 1, musicVolume: 55, sfxVolume: 55, currentLevel: 1, collectedFractals: {},
+        fragments: [], musicMuted: false, sfxMuted: false, evolutionLog: [],
+        language: "zh"
+    };
+    const defaultFrags = [{x:2706,y:634,type:1},{x:2406,y:1801,type:2},{x:1010,y:2304,type:3},{x:1450,y:509,type:1},{x:979,y:754,type:2},{x:2100,y:1400,type:3}];
+    window.gameConfig.fragments = defaultFrags.map(f=>({...f}));
+    for(let i=6;i<9;i++) window.gameConfig.fragments.push({x:Math.random()*2800+200, y:Math.random()*2800+200, type:(i%3)+1});
+    window.gameConfig.evolutionLog = [{version:"v17.0",desc:"✨ 界面净透 ✨ 底部导航透明，宝库分形四周留白，点击全屏放大"},{version:"v16.0",desc:"礼盒随机增删与全屏消除动画"}];
+    
+    let audioCtx = null, musicSource = null, musicGain = null, sfxBuffers = {};
+    function initAudio() { if(audioCtx) return; audioCtx = new (window.AudioContext||window.webkitAudioContext)(); musicGain = audioCtx.createGain(); musicGain.connect(audioCtx.destination); musicGain.gain.value = (window.gameConfig.musicVolume/100)*(window.gameConfig.musicMuted?0:1); }
+    async function preloadAudio() { if(!audioCtx) initAudio(); for(let id of Object.keys(ASSET_MAP)) { if(ASSET_MAP[id].type==='audio'){ try{ let resp=await fetch(ASSET_MAP[id].url); let buf=await resp.arrayBuffer(); let decoded=await audioCtx.decodeAudioData(buf); sfxBuffers[id]=decoded; }catch(e){} } } }
+    function playSFX(id, detune=0) { if(window.gameConfig.sfxMuted) return; let buf=sfxBuffers[id]; if(!buf||!audioCtx) return; let src=audioCtx.createBufferSource(); src.buffer=buf; let gain=audioCtx.createGain(); gain.gain.value=window.gameConfig.sfxVolume/100; src.connect(gain); gain.connect(audioCtx.destination); if(src.detune) src.detune.value=detune; src.start(); }
+    function playMusicByLevel() { if(musicSource) try{musicSource.stop();}catch(e){} let level=window.gameConfig.currentLevel||1; let musicId = level===1?"ambient_music":`bg_music_lv${Math.min(level,5)}`; let buf=sfxBuffers[musicId]; if(!buf) buf=sfxBuffers["ambient_music"]; if(!buf||!audioCtx) return; musicSource=audioCtx.createBufferSource(); musicSource.buffer=buf; musicSource.loop=true; musicSource.connect(musicGain); musicSource.start(); }
+    function stopMusic() { if(musicSource){ try{ musicSource.stop(); }catch(e){} musicSource=null; } }
+    document.body.addEventListener('click',()=>{ if(audioCtx && audioCtx.state==='suspended') { audioCtx.resume(); playMusicByLevel(); } },{once:true});
+    
+    // 分形绘制核心 (保留)
+    function drawFractalPattern(ctx, params, x, y, sizeScale, globalAlpha=1.0) {
+        if (!params) return;
+        const { sides, depth, spread, lengthBase, growthFactor, lineWidth, color, rotation } = params;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation || 0);
+        ctx.strokeStyle = color || "#cccccc";
+        ctx.lineWidth = (lineWidth || 2) * sizeScale;
+        ctx.globalAlpha = globalAlpha;
+        ctx.lineCap = 'round';
+        const totalLen = (lengthBase || 45) * sizeScale;
+        function drawBranch(cx, cy, angle, currentLen, remainingDepth) {
+            if (remainingDepth <= 0) return;
+            const newX = cx + Math.cos(angle) * currentLen;
+            const newY = cy + Math.sin(angle) * currentLen;
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(newX, newY); ctx.stroke();
+            const nextLen = currentLen * (growthFactor || 0.68);
+            drawBranch(newX, newY, angle - spread, nextLen, remainingDepth-1);
+            drawBranch(newX, newY, angle + spread, nextLen, remainingDepth-1);
+        }
+        for (let i = 0; i < sides; i++) drawBranch(0, 0, (Math.PI*2/sides)*i, totalLen, depth);
+        ctx.restore();
+    }
+    function generateRandomFractalParams(baseColor) {
+        const isComplex = Math.random() > 0.5;
+        let sides = isComplex ? 6+Math.floor(Math.random()*5) : 3+Math.floor(Math.random()*2);
+        let depth = isComplex ? 5+Math.floor(Math.random()*3) : 2+Math.floor(Math.random()*2);
+        let spread = isComplex ? 0.7+Math.random()*1.0 : 0.6+Math.random()*0.5;
+        let lengthBase = isComplex ? 45+Math.random()*55 : 35+Math.random()*30;
+        let growthFactor = isComplex ? 0.55+Math.random()*0.2 : 0.7+Math.random()*0.15;
+        let lineWidth = isComplex ? 1.5+Math.random()*2.0 : 2.0+Math.random()*1.5;
+        return { sides, depth, spread, lengthBase, growthFactor, lineWidth, color: baseColor, rotation: Math.random()*Math.PI*2 };
+    }
+    
+    async function run(mode) {
+        initAudio(); await preloadAudio();
+        let imgCache={};
+        for(let [id,info] of Object.entries(ASSET_MAP)) if(info.type==='image'){ let img=new Image(); img.src=info.url; imgCache[id]=img; await new Promise(r=>{img.onload=r;}); }
+        const canvas=document.getElementById('game-canvas'), ctx=canvas.getContext('2d');
+        const bgCanvas=document.getElementById('background-canvas'), bgCtx=bgCanvas.getContext('2d');
+        const midCanvas=document.getElementById('mid-canvas'), midCtx=midCanvas.getContext('2d');
+        let fractalTime=0, collectedFragments=[], gameCompleted=false, completionTimer=0, transitionAlpha=0;
+        let activeGiftBox=null;
+        let gloriousFractals=[];
+        let eliminateAnimation = null;
+        const WORLD={width:3400,height:3400};
+        let player={x:WORLD.width/2,y:WORLD.height/2,size:28,speed:500};
+        let camera={x:player.x,y:player.y,zoom:1,targetZoom:1};
+        let cursorPos = { x: canvas.width/2, y: canvas.height/2 };
+        let cursorTrail = [];
+        const TRAIL_MAX = 42;
+        function updateCursorScreenPos(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            let sx = clientX - rect.left, sy = clientY - rect.top;
+            if(sx>=0 && sx<=canvas.width && sy>=0 && sy<=canvas.height) {
+                cursorPos = { x: sx, y: sy };
+                cursorTrail.push({ x: sx, y: sy, life: 1.0 });
+                if(cursorTrail.length > TRAIL_MAX) cursorTrail.shift();
+            }
+        }
+        canvas.addEventListener('mousemove', (e) => { updateCursorScreenPos(e.clientX, e.clientY); });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if(e.touches.length) updateCursorScreenPos(e.touches[0].clientX, e.touches[0].clientY); });
+        canvas.addEventListener('touchstart', (e) => { if(e.touches.length) updateCursorScreenPos(e.touches[0].clientX, e.touches[0].clientY); });
+        
+        const colorPalettes = {
+            cosmic_purple:{bg:'#1a0033',stars:['#ff00ff','#00ffff','#7000ff'],accent:'#cccccc',player_color:'#1E62E6',isLight:false},
+            void_blue:{bg:'#000510',stars:['#0066ff','#00ffff','#ffffff'],accent:'#cccccc',player_color:'#1E62E6',isLight:false},
+            nebula_red:{bg:'#200000',stars:['#ff3300','#ffd700','#ff0066'],accent:'#cccccc',player_color:'#1E62E6',isLight:false},
+            radiant_light:{bg:'#f0f0f0',stars:['#aaaaaa','#cccccc','#888888'],accent:'#222222',player_color:'#1E62E6',isLight:true}
+        };
+        let currentPalette = colorPalettes[window.gameConfig.colorPalette];
+        let nebulaPoints = Array.from({length:14},()=>({x:Math.random()*WORLD.width,y:Math.random()*WORLD.height,size:350+Math.random()*500,color:Math.floor(Math.random()*3),speed:0.2+Math.random()*0.5,phase:Math.random()*Math.PI*2}));
+        function updateProgress(){ let total=window.gameConfig.fragments.length; let cont=document.getElementById('progress-dots-container'); if(!cont)return; cont.innerHTML=''; for(let i=0;i<total;i++){ let dot=document.createElement('div'); dot.className='progress-dot'+(i<collectedFragments.length?' filled':''); cont.appendChild(dot); } document.getElementById('level-stats').innerText=window.gameConfig.currentLevel||1; }
+        function addFullscreenFractal(x,y,color) { gloriousFractals.push({ x, y, params: generateRandomFractalParams(color), life: 0.0, maxLife: 1.0 }); }
+        function collectFragment(index, wx, wy, color) {
+            if(collectedFragments.includes(index)) return;
+            collectedFragments.push(index);
+            playSFX('wind_chime_1', 300 + Math.random()*600);
+            addFullscreenFractal(wx, wy, color);
+            updateProgress();
+            if(collectedFragments.length === window.gameConfig.fragments.length) triggerCompletion();
+            let lvl=window.gameConfig.currentLevel;
+            if(!window.gameConfig.collectedFractals[lvl]) window.gameConfig.collectedFractals[lvl]=[];
+            window.gameConfig.collectedFractals[lvl].push(generateRandomFractalParams(color));
+            lib.saveUserGameState(window.gameConfig);
+        }
+        function applyGiftEffect(giftWorldX, giftWorldY) {
+            if(Math.random() < 0.6) {
+                let addCount = Math.floor(Math.random() * 3) + 1;
+                for(let i=0;i<addCount;i++) window.gameConfig.fragments.push({ x: giftWorldX+(Math.random()-0.5)*400, y: giftWorldY+(Math.random()-0.5)*400, type: Math.floor(Math.random()*3)+1 });
+                updateProgress();
+                addFullscreenFractal(giftWorldX, giftWorldY, currentPalette.accent);
+                playSFX('completion_sfx', 200);
+            } else {
+                let uncollected = []; for(let i=0;i<window.gameConfig.fragments.length;i++) if(!collectedFragments.includes(i)) uncollected.push(i);
+                if(uncollected.length===0) return;
+                eliminateAnimation = { indices: uncollected, currentIdx: 0, active: false, currentFrag: null, progress: 0 };
+                startNextEliminate();
+            }
+        }
+        function startNextEliminate() {
+            if(!eliminateAnimation) return;
+            if(eliminateAnimation.currentIdx >= eliminateAnimation.indices.length){ eliminateAnimation=null; if(collectedFragments.length===window.gameConfig.fragments.length) triggerCompletion(); return; }
+            let idx = eliminateAnimation.indices[eliminateAnimation.currentIdx];
+            let frag = window.gameConfig.fragments[idx];
+            eliminateAnimation.currentFrag = { idx, x: frag.x, y: frag.y };
+            eliminateAnimation.progress = 0; eliminateAnimation.active = true;
+        }
+        function triggerCompletion(){ if(gameCompleted)return; gameCompleted=true; playSFX('completion_sfx'); camera.targetZoom=0.7; lib.addPlayerScoreToLeaderboard(window.gameConfig.currentLevel); }
+        function initLevel(){ let lvl=window.gameConfig.currentLevel||1; let fragCount=5+Math.min(9,lvl-1); window.gameConfig.fragments=[]; for(let i=0;i<fragCount;i++) window.gameConfig.fragments.push({x:Math.random()*(WORLD.width-600)+300,y:Math.random()*(WORLD.height-600)+300,type:(i%3)+1}); player.x=WORLD.width/2; player.y=WORLD.height/2; collectedFragments=[]; gameCompleted=false; transitionAlpha=0; updateProgress(); stopMusic(); playMusicByLevel(); eliminateAnimation=null; gloriousFractals=[]; }
+        initLevel();
+        function drawNebula(ctx,p){ ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height); nebulaPoints.forEach(pnt=>{ let sx=(pnt.x-camera.x)*camera.zoom+ctx.canvas.width/2, sy=(pnt.y-camera.y)*camera.zoom+ctx.canvas.height/2, rad=pnt.size*camera.zoom*0.6, grad=ctx.createRadialGradient(sx,sy,0,sx,sy,rad); grad.addColorStop(0,p.stars[pnt.color]+'44'); grad.addColorStop(1,'transparent'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(sx,sy,rad,0,Math.PI*2); ctx.fill(); }); }
+        let lastTime=performance.now();
+        function gameLoop(now){
+            let dt=Math.min(0.033,(now-lastTime)/1000); lastTime=now;
+            fractalTime+=dt*(window.gameConfig.animationSpeed||1);
+            if(!gameCompleted && mode==='play'){
+                let targetWorldX = (cursorPos.x - canvas.width/2)/camera.zoom + camera.x, targetWorldY = (cursorPos.y - canvas.height/2)/camera.zoom + camera.y;
+                let dx=targetWorldX-player.x, dy=targetWorldY-player.y, dist=Math.hypot(dx,dy);
+                if(dist>1){ let move=Math.min(player.speed*dt,dist), ang=Math.atan2(dy,dx); player.x+=Math.cos(ang)*move; player.y+=Math.sin(ang)*move; }
+                else { player.x=targetWorldX; player.y=targetWorldY; }
+                player.x=Math.min(Math.max(player.size,player.x),WORLD.width-player.size); player.y=Math.min(Math.max(player.size,player.y),WORLD.height-player.size);
+                for(let i=0;i<window.gameConfig.fragments.length;i++) if(!collectedFragments.includes(i) && Math.hypot(player.x-window.gameConfig.fragments[i].x, player.y-window.gameConfig.fragments[i].y)<55){ collectFragment(i, window.gameConfig.fragments[i].x, window.gameConfig.fragments[i].y, currentPalette.accent); break; }
+                if(activeGiftBox && !eliminateAnimation && Math.hypot(player.x-activeGiftBox.x, player.y-activeGiftBox.y)<70){ let gx=activeGiftBox.x,gy=activeGiftBox.y; activeGiftBox=null; applyGiftEffect(gx,gy); }
+                if(activeGiftBox===null && !gameCompleted && Math.random()<0.007 && !eliminateAnimation) activeGiftBox={x:Math.random()*WORLD.width,y:Math.random()*WORLD.height,size:65,life:10,phase:0};
+                if(activeGiftBox && !eliminateAnimation){ activeGiftBox.life-=dt; if(activeGiftBox.life<=0) activeGiftBox=null; }
+            }
+            if(eliminateAnimation){
+                if(eliminateAnimation.active){
+                    eliminateAnimation.progress += dt*3;
+                    if(eliminateAnimation.progress>=1){
+                        let idx = eliminateAnimation.currentFrag.idx;
+                        if(!collectedFragments.includes(idx)){ collectedFragments.push(idx); updateProgress(); playSFX('wind_chime_1',300+Math.random()*600); let cx=canvas.width/2, cy=canvas.height/2, cwx=(cx-canvas.width/2)/camera.zoom+camera.x, cwy=(cy-canvas.height/2)/camera.zoom+camera.y; addFullscreenFractal(cwx,cwy,currentPalette.accent); }
+                        eliminateAnimation.currentIdx++; eliminateAnimation.active=false;
+                        startNextEliminate();
+                    }
+                } else startNextEliminate();
+            }
+            for(let i=0;i<cursorTrail.length;i++){ cursorTrail[i].life -= dt*1.2; if(cursorTrail[i].life<=0) cursorTrail.splice(i--,1); }
+            for(let i=0;i<gloriousFractals.length;i++){ let gf=gloriousFractals[i]; gf.life+=dt*1.2; if(gf.life>=gf.maxLife) gloriousFractals.splice(i--,1); }
+            camera.x+=(player.x-camera.x)*0.12; camera.y+=(player.y-camera.y)*0.12; camera.zoom+=(camera.targetZoom-camera.zoom)*0.1;
+            currentPalette=colorPalettes[window.gameConfig.colorPalette]||colorPalettes.cosmic_purple;
+            drawNebula(bgCtx,currentPalette);
+            midCtx.clearRect(0,0,midCanvas.width,midCanvas.height); midCtx.save(); midCtx.translate(midCanvas.width/2,midCanvas.height/2); midCtx.rotate(fractalTime*0.06); midCtx.strokeStyle=currentPalette.accent; midCtx.lineWidth=1.5; midCtx.globalAlpha=0.35; for(let r=0;r<7;r++){ let ang=(Math.PI*2/7)*r; let x2=Math.cos(ang)*170*camera.zoom, y2=Math.sin(ang)*170*camera.zoom; midCtx.beginPath(); midCtx.moveTo(0,0); midCtx.lineTo(x2,y2); midCtx.stroke(); } midCtx.restore();
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            for(let i=0;i<window.gameConfig.fragments.length;i++) if(!collectedFragments.includes(i) && !(eliminateAnimation && eliminateAnimation.active && eliminateAnimation.currentFrag?.idx===i)){ let f=window.gameConfig.fragments[i], sx=(f.x-camera.x)*camera.zoom+canvas.width/2, sy=(f.y-camera.y)*camera.zoom+canvas.height/2, img=imgCache[`art_fragment_${f.type}`]; if(img){ let sz=78*camera.zoom; ctx.drawImage(img,sx-sz/2,sy-sz/2,sz,sz); } }
+            if(eliminateAnimation && eliminateAnimation.active && eliminateAnimation.currentFrag){ let frag=eliminateAnimation.currentFrag, f=window.gameConfig.fragments[frag.idx], startX=(f.x-camera.x)*camera.zoom+canvas.width/2, startY=(f.y-camera.y)*camera.zoom+canvas.height/2, endX=canvas.width/2, endY=canvas.height/2, t=eliminateAnimation.progress, curX=startX+(endX-startX)*t, curY=startY+(endY-startY)*t, img=imgCache[`art_fragment_${f.type}`]; if(img){ let sz=78*camera.zoom*(1+t*0.5); ctx.drawImage(img,curX-sz/2,curY-sz/2,sz,sz); } }
+            for(let gf of gloriousFractals){ let sx=(gf.x-camera.x)*camera.zoom+canvas.width/2, sy=(gf.y-camera.y)*camera.zoom+canvas.height/2, prog=gf.life/gf.maxLife, scale=0.2+prog*4.5, alpha=prog<0.7?prog*1.2:(1-(prog-0.7)/0.3); drawFractalPattern(ctx,gf.params,sx,sy,camera.zoom*scale,Math.min(1,alpha)); }
+            let playerImg=imgCache['player_character']; if(playerImg){ let px=(player.x-camera.x)*camera.zoom+canvas.width/2, py=(player.y-camera.y)*camera.zoom+canvas.height/2, psz=player.size*1.9*camera.zoom; ctx.drawImage(playerImg,px-psz/2,py-psz/2,psz,psz); }
+            if(activeGiftBox && !eliminateAnimation){ let gx=(activeGiftBox.x-camera.x)*camera.zoom+canvas.width/2, gy=(activeGiftBox.y-camera.y)*camera.zoom+canvas.height/2, gs=65*camera.zoom; ctx.save(); ctx.shadowBlur=12; ctx.shadowColor="#ffaa66"; ctx.fillStyle="#e8a87c"; ctx.beginPath(); ctx.roundRect(gx-gs/2, gy-gs/2, gs, gs, 12); ctx.fill(); ctx.fillStyle="#ffd966"; ctx.fillRect(gx-gs/3, gy-gs/2, gs*0.66, gs); ctx.fillRect(gx-gs/2, gy-gs/3, gs, gs*0.66); ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(gx, gy, gs*0.18, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+            for(let i=0;i<cursorTrail.length;i++){ let t=cursorTrail[i], rad=12*(0.3+t.life*0.9); ctx.beginPath(); ctx.arc(t.x,t.y,rad,0,Math.PI*2); ctx.fillStyle=`rgba(30,98,230,${t.life*0.6})`; ctx.fill(); ctx.beginPath(); ctx.arc(t.x,t.y,rad*0.6,0,Math.PI*2); ctx.fillStyle=`rgba(70,150,255,${t.life*0.8})`; ctx.fill(); }
+            if(cursorPos.x>0 && cursorPos.y>0){ ctx.beginPath(); ctx.arc(cursorPos.x,cursorPos.y,22,0,Math.PI*2); ctx.fillStyle=`rgba(30,98,230,0.95)`; ctx.fill(); ctx.beginPath(); ctx.arc(cursorPos.x,cursorPos.y,10,0,Math.PI*2); ctx.fillStyle="#ffffff"; ctx.fill(); ctx.shadowBlur=24; ctx.shadowColor="#1E62E6"; ctx.beginPath(); ctx.arc(cursorPos.x,cursorPos.y,30,0,Math.PI*2); ctx.fillStyle="rgba(30,98,230,0.4)"; ctx.fill(); ctx.shadowBlur=0; }
+            if(gameCompleted){ completionTimer+=dt; transitionAlpha=Math.min(0.75,transitionAlpha+dt*2.2); ctx.fillStyle=`rgba(0,0,0,${transitionAlpha})`; ctx.fillRect(0,0,canvas.width,canvas.height); if(completionTimer<1.5){ ctx.font=`bold 52px 'Orbitron'`; ctx.fillStyle="#ffffff"; ctx.textAlign="center"; ctx.fillText("✦ 灵境飞升 ✦",canvas.width/2,canvas.height/2-80); ctx.font=`bold 170px 'Orbitron'`; ctx.fillStyle="#ddddff"; ctx.fillText((window.gameConfig.currentLevel+1).toString(),canvas.width/2,canvas.height/2+70); } else { window.gameConfig.currentLevel+=1; initLevel(); gameCompleted=false; completionTimer=0; } }
+            requestAnimationFrame(gameLoop);
+        }
+        requestAnimationFrame(gameLoop);
+        
+        // ================= UI 功能 =================
+        function bindModal(trigger, modal, closeSel) { if(trigger && modal) { trigger.onclick=(e)=>{ e.stopPropagation(); modal.classList.add('visible'); playSFX('ui_click_sfx'); }; modal.querySelector(closeSel).onclick=()=>{ modal.classList.remove('visible'); playSFX('ui_click_sfx'); }; modal.onclick=(e)=>{ if(e.target===modal) modal.classList.remove('visible'); }; } }
+        bindModal(document.getElementById('version-trigger'), document.getElementById('version-modal'), '.version-close');
+        bindModal(document.getElementById('treasury-trigger'), document.getElementById('treasury-modal'), '.treasury-close');
+        bindModal(document.getElementById('level-library-trigger'), document.getElementById('level-lib-modal'), '.level-lib-close');
+        bindModal(document.getElementById('mute-toggle'), document.getElementById('audio-modal'), '.audio-close');
+        bindModal(document.getElementById('theme-trigger'), document.getElementById('theme-modal'), '.theme-close');
+        bindModal(document.getElementById('leaderboard-trigger'), document.getElementById('leaderboard-modal'), '.leaderboard-close');
+        document.getElementById('intro-text').innerHTML = "<h3>✨ 灵触净界 · 纯净绽放 ✨</h3><p>蓝色流光随行，触碰碎片即收，单一分形由小至满屏绽放。礼盒随机增删碎片，全屏消除动画精美。</p>";
+        const logDiv = document.getElementById('log-list'); logDiv.innerHTML = window.gameConfig.evolutionLog.map(l => `<div style="margin-bottom:20px;"><b>${l.version}</b><br/>${l.desc}</div>`).join('');
+        const tabs = document.querySelectorAll('#version-modal .modal-tab');
+        const contents = { intro: document.getElementById('intro-tab'), log: document.getElementById('log-tab') };
+        tabs.forEach(tab => { tab.onclick = () => { tabs.forEach(t=>t.classList.remove('active')); tab.classList.add('active'); const target=tab.dataset.tab; Object.values(contents).forEach(c=>c.classList.remove('active')); if(target==='intro') contents.intro.classList.add('active'); else if(target==='log') contents.log.classList.add('active'); playSFX('ui_click_sfx'); }; });
+        
+        // 宝库渲染 + 全屏放大 (点击全屏，再点击关闭)
+        let currentTreasuryCols = 5;
+        document.querySelectorAll('#treasury-modal .view-mode-btn').forEach(btn => { btn.onclick = () => { currentTreasuryCols = parseInt(btn.dataset.cols); document.querySelectorAll('#treasury-modal .view-mode-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderTreasury(); playSFX('ui_click_sfx'); }; });
+        const fullscreenZoom = document.getElementById('fullscreen-zoom');
+        const fullCanvas = document.getElementById('fullscreen-canvas');
+        fullscreenZoom.onclick = () => { fullscreenZoom.classList.remove('visible'); playSFX('ui_click_sfx'); };
+        function renderTreasury() {
+            const container = document.getElementById('treasury-grid');
+            container.innerHTML = '';
+            let collected = window.gameConfig.collectedFractals || {};
+            let levels = Object.keys(collected).sort((a,b)=>parseInt(a)-parseInt(b));
+            for(let lvl of levels) {
+                let section = document.createElement('div');
+                section.innerHTML = `<h3 style="margin:20px 0 12px; color:#ccc">🌀 维度 ${lvl}</h3><div class="treasury-grid cols-${currentTreasuryCols}" id="grid-${lvl}"></div>`;
+                container.appendChild(section);
+                let grid = section.querySelector(`.treasury-grid`);
+                collected[lvl].forEach((params, idx) => {
+                    let item = document.createElement('div'); item.className = 'fractal-item';
+                    let cv = document.createElement('canvas'); cv.width = 300; cv.height = 300;
+                    let ctxTemp = cv.getContext('2d');
+                    ctxTemp.fillStyle = '#0a0a12'; ctxTemp.fillRect(0,0,300,300);
+                    drawFractalPattern(ctxTemp, params, 150, 150, 1.4, 1.0);
+                    item.appendChild(cv);
+                    // 点击放大
+                    item.onclick = (e) => {
+                        e.stopPropagation();
+                        fullCanvas.width = 1000; fullCanvas.height = 1000;
+                        let fCtx = fullCanvas.getContext('2d');
+                        fCtx.fillStyle = '#000'; fCtx.fillRect(0,0,1000,1000);
+                        drawFractalPattern(fCtx, params, 500, 500, 4.2, 1.0);
+                        fullscreenZoom.classList.add('visible');
+                        playSFX('ui_click_sfx');
+                    };
+                    grid.appendChild(item);
+                });
+            }
+            if(levels.length===0) container.innerHTML = '<p style="color:gray; text-align:center">✨ 尚未收集任何分形印记 ✨</p>';
+        }
+        document.getElementById('treasury-trigger').onclick = () => { renderTreasury(); document.getElementById('treasury-modal').classList.add('visible'); playSFX('ui_click_sfx'); };
+        
+        async function renderLevelLibrary() { const state = await lib.getUserGameState(); const highest = state.state?.currentLevel || 1; const cur = window.gameConfig.currentLevel; const container = document.getElementById('level-grid'); container.innerHTML = ''; for(let i=1;i<=Math.max(12, highest+3);i++) { let card = document.createElement('div'); card.className = `level-card ${i>highest?'locked':''} ${i===cur?'current':''}`; card.innerHTML = `<div class="level-num">${i}</div>`; if(i <= highest) card.onclick = () => { window.gameConfig.currentLevel = i; initLevel(); document.getElementById('level-lib-modal').classList.remove('visible'); playSFX('ui_click_sfx'); }; container.appendChild(card); } }
+        document.getElementById('level-library-trigger').onclick = () => { renderLevelLibrary(); document.getElementById('level-lib-modal').classList.add('visible'); playSFX('ui_click_sfx'); };
+        
+        let musicSlider = document.getElementById('music-slider'), sfxSlider = document.getElementById('sfx-slider');
+        musicSlider.oninput = () => { let v=musicSlider.value; document.getElementById('music-val').innerText=v+'%'; window.gameConfig.musicVolume=parseInt(v); if(musicGain) musicGain.gain.value=(v/100)*(window.gameConfig.musicMuted?0:1); };
+        sfxSlider.oninput = () => { let v=sfxSlider.value; document.getElementById('sfx-val').innerText=v+'%'; window.gameConfig.sfxVolume=parseInt(v); };
+        document.getElementById('music-mute-btn').onclick = () => { window.gameConfig.musicMuted = !window.gameConfig.musicMuted; if(musicGain) musicGain.gain.value=(window.gameConfig.musicVolume/100)*(window.gameConfig.musicMuted?0:1); playSFX('ui_click_sfx'); };
+        document.getElementById('sfx-mute-btn').onclick = () => { window.gameConfig.sfxMuted = !window.gameConfig.sfxMuted; playSFX('ui_click_sfx'); };
+        musicSlider.value = window.gameConfig.musicVolume; document.getElementById('music-val').innerText = window.gameConfig.musicVolume+'%';
+        sfxSlider.value = window.gameConfig.sfxVolume; document.getElementById('sfx-val').innerText = window.gameConfig.sfxVolume+'%';
+        const themeGrid = document.getElementById('theme-options');
+        Object.keys(colorPalettes).forEach(key => { let btn = document.createElement('button'); btn.innerText = key==='cosmic_purple'?'宇宙紫':(key==='void_blue'?'虚空蓝':(key==='nebula_red'?'星云红':'明亮模式')); btn.style.cssText = 'background:rgba(255,255,255,0.1);border:1px solid #ccc;border-radius:40px;padding:12px;color:white;cursor:pointer;'; btn.onclick = () => { window.gameConfig.colorPalette = key; document.getElementById('theme-modal').classList.remove('visible'); playSFX('ui_click_sfx'); }; themeGrid.appendChild(btn); });
+        document.getElementById('leaderboard-trigger').onclick = async () => { let lb = await lib.getTopNEntriesFromLeaderboard(10); let html = lb.entries.map((e,i)=>`<div style="display:flex;justify-content:space-between;padding:12px;border-bottom:1px solid #333"><span>#${i+1}</span><span>${e.username||"灵迹旅者"}</span><span>⭐ 维度 ${e.score}</span></div>`).join(''); if(!html) html = '<div style="text-align:center;padding:20px;">✨ 暂无星痕记录 ✨</div>'; document.getElementById('leaderboard-list').innerHTML = html; document.getElementById('leaderboard-modal').classList.add('visible'); playSFX('ui_click_sfx'); };
+        let savedState = await lib.getUserGameState(); if(savedState.state && savedState.state.currentLevel > 1) { let cont = document.getElementById('continue-modal'); document.getElementById('saved-level-num').innerText = savedState.state.currentLevel; cont.classList.add('visible'); document.getElementById('continue-confirm').onclick = () => { window.gameConfig.currentLevel = savedState.state.currentLevel; initLevel(); cont.classList.remove('visible'); playSFX('ui_click_sfx'); }; document.getElementById('restart-confirm').onclick = async () => { await lib.deleteUserGameState(); window.gameConfig.currentLevel = 1; initLevel(); cont.classList.remove('visible'); playSFX('ui_click_sfx'); }; }
+        window.addEventListener('resize', () => { let w=window.innerWidth,h=window.innerHeight; canvas.width=bgCanvas.width=midCanvas.width=w; canvas.height=bgCanvas.height=midCanvas.height=h; cursorPos = { x: w/2, y: h/2 }; });
+        window.dispatchEvent(new Event('resize'));
+        if(audioCtx && audioCtx.state==='suspended') audioCtx.resume().then(()=>playMusicByLevel());
+        else playMusicByLevel();
+    }
+    run('play');
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) { if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2; this.moveTo(x+r, y); this.lineTo(x+w-r, y); this.quadraticCurveTo(x+w, y, x+w, y+r); this.lineTo(x+w, y+h-r); this.quadraticCurveTo(x+w, y+h, x+w-r, y+h); this.lineTo(x+r, y+h); this.quadraticCurveTo(x, y+h, x, y+h-r); this.lineTo(x, y+r); this.quadraticCurveTo(x, y, x+r, y); return this; };
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>🍬 水晶果园 · Crystal Fruit Match</title>
+    <style>
+        :root {
+            --bg: #0a0f1a;
+            --surface: rgba(20, 30, 50, 0.7);
+            --gold: #ffd966;
+            --pink: #ff7eb3;
+            --cyan: #5ce1e6;
+            --text: #eef5ff;
+            --text-dim: #8899cc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            background: var(--bg);
+            background-image:
+                radial-gradient(ellipse at 40% 30%, rgba(100, 150, 255, 0.15) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 60%, rgba(255, 100, 150, 0.1) 0%, transparent 60%),
+                radial-gradient(ellipse at 30% 80%, rgba(100, 255, 200, 0.08) 0%, transparent 60%);
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        #gameContainer {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 480px;
+            padding: 0 16px;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 18px;
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+        .title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #fff;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+        }
+        .stats {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+        .stat-label {
+            font-size: 0.6rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fff;
+            min-width: 36px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 2px 10px;
+        }
+        .stat-value.score {
+            color: var(--gold);
+            text-shadow: 0 0 10px rgba(255, 217, 102, 0.6);
+        }
+        .stat-value.combo {
+            color: var(--pink);
+            text-shadow: 0 0 10px rgba(255, 126, 179, 0.6);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255, 255, 255, 0.25);
+            background: rgba(30, 40, 60, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            color: #fff;
+            font-size: 1.2rem;
+        }
+        .icon-btn:active {
+            transform: scale(0.9);
+            border-color: #fff;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+        }
+        .icon-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: #ddd;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: 24px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.08);
+            background: rgba(10, 16, 30, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            touch-action: none;
+        }
+
+        .footer-hint {
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.4);
+            text-align: center;
+            padding-bottom: 8px;
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 10px 14px;
+                border-radius: 24px;
+            }
+            .title {
+                font-size: 1.1rem;
+            }
+            .stat-value {
+                font-size: 1rem;
+                min-width: 28px;
+                padding: 2px 8px;
+            }
+            .icon-btn {
+                width: 36px;
+                height: 36px;
+            }
+            .icon-btn svg {
+                width: 16px;
+                height: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="header">
+            <span class="title">💎 水晶果园</span>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-label">得分</span>
+                    <span class="stat-value score" id="scoreDisplay">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">连击</span>
+                    <span class="stat-value combo" id="comboDisplay">x1</span>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="icon-btn" id="btnFullscreen" title="全屏模式" aria-label="全屏切换">
+                    <svg id="fullscreenIcon" viewBox="0 0 24 24">
+                        <polyline points="8 3 3 3 3 8"></polyline>
+                        <polyline points="16 3 21 3 21 8"></polyline>
+                        <polyline points="21 16 21 21 16 21"></polyline>
+                        <polyline points="3 16 3 21 8 21"></polyline>
+                    </svg>
+                </button>
+                <button class="icon-btn" id="btnSound" title="音效开关">
+                    <span id="soundIcon">🔊</span>
+                </button>
+            </div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div class="footer-hint">滑动交换相邻水果 ✦ 三个以上消除</div>
+    </div>
+
+    <script>
+        (function() {
+            // ========== DOM元素 ==========
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const comboDisplay = document.getElementById('comboDisplay');
+            const btnFullscreen = document.getElementById('btnFullscreen');
+            const btnSound = document.getElementById('btnSound');
+            const soundIcon = document.getElementById('soundIcon');
+            const fullscreenIcon = document.getElementById('fullscreenIcon');
+
+            // ========== 画布尺寸 ==========
+            const COLS = 8;
+            const ROWS = 8;
+            let CELL_SIZE;
+            let GRID_OFFSET_X;
+            let GRID_OFFSET_Y;
+            let canvasSize;
+
+            function resizeCanvas() {
+                const container = document.getElementById('gameContainer');
+                const maxWidth = Math.min(container.clientWidth - 32, 480);
+                canvasSize = Math.floor(maxWidth);
+                canvas.width = canvasSize;
+                canvas.height = canvasSize;
+                CELL_SIZE = canvasSize / COLS;
+                GRID_OFFSET_X = 0;
+                GRID_OFFSET_Y = 0;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                // 如果游戏未开始，重新绘制初始网格
+                if (gameState === 'idle') drawBoard();
+            });
+
+            // ========== 音效引擎 ==========
+            let audioCtx = null;
+            let soundEnabled = true;
+
+            function initAudio() {
+                if (!audioCtx) {
+                    try { audioCtx = new(window.AudioContext || window.webkitAudioContext)(); } catch (e) {
+                        soundEnabled = false;
+                        updateSoundIcon();
+                        return;
+                    }
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            }
+
+            function playTone(freq, type, duration, vol = 0.08, glide = null) {
+                if (!soundEnabled || !audioCtx) return;
+                try {
+                    const t = audioCtx.currentTime;
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, t);
+                    if (glide) osc.frequency.linearRampToValueAtTime(glide, t + duration);
+                    gain.gain.setValueAtTime(vol, t);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(t);
+                    osc.stop(t + duration);
+                } catch (e) {}
+            }
+
+            function sfxSwap() { playTone(300, 'sine', 0.1, 0.04);
+                playTone(500, 'sine', 0.06, 0.06); }
+
+            function sfxMatch() { playTone(600, 'sine', 0.05, 0.08);
+                playTone(800, 'triangle', 0.04, 0.1, 1200); }
+
+            function sfxCombo() { playTone(400, 'sine', 0.03, 0.06);
+                playTone(900, 'sine', 0.03, 0.1, 1400);
+                playTone(1400, 'triangle', 0.02, 0.12); }
+
+            function sfxInvalid() { playTone(100, 'sawtooth', 0.1, 0.2, 50); }
+
+            function updateSoundIcon() { soundIcon.textContent = soundEnabled ? '🔊' : '🔇'; }
+
+            // ========== 游戏数据 ==========
+            const NUM_TYPES = 6;
+            const FRUIT_COLORS = [
+                '#ff4d6a', '#ff8c42', '#ffd23f', '#6bcb77', '#4d96ff', '#c77dff'
+            ];
+            const FRUIT_HIGHLIGHTS = [
+                '#ff99aa', '#ffb380', '#ffe680', '#99dd99', '#80b3ff', '#d9b3ff'
+            ];
+
+            let board = []; // board[row][col] = type (0-5) or -1
+            let gameState = 'idle'; // idle | animating | checking
+            let score = 0;
+            let comboCount = 0;
+            let selectedCell = null; // {row, col}
+            let swapPair = null; // {r1,c1,r2,c2}
+            let animatingCells = []; // cells being removed or moved
+
+            // 动画相关
+            let removeAnimProgress = 0;
+            let moveAnimProgress = 0;
+            let matchesToRemove = [];
+            let moveList = []; // {fromRow, fromCol, toRow, toCol, type}
+
+            function initBoard() {
+                board = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        let type;
+                        do {
+                            type = Math.floor(Math.random() * NUM_TYPES);
+                        } while (wouldMatch(r, c, type));
+                        board[r][c] = type;
+                    }
+                }
+            }
+
+            function wouldMatch(row, col, type) {
+                // 检查水平
+                if (col >= 2 &&
+                    board[row][col - 1] === type &&
+                    board[row][col - 2] === type) return true;
+                // 检查垂直
+                if (row >= 2 &&
+                    board[row - 1] &&
+                    board[row - 1][col] === type &&
+                    board[row - 2] &&
+                    board[row - 2][col] === type) return true;
+                return false;
+            }
+
+            function getCellFromPoint(clientX, clientY) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const x = (clientX - rect.left) * scaleX;
+                const y = (clientY - rect.top) * scaleY;
+                const col = Math.floor(x / CELL_SIZE);
+                const row = Math.floor(y / CELL_SIZE);
+                if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
+                    return { row, col };
+                }
+                return null;
+            }
+
+            // ========== 查找匹配 ==========
+            function findAllMatches() {
+                const matched = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+                let hasMatch = false;
+                // 水平
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS - 2; c++) {
+                        const type = board[r][c];
+                        if (type === -1) continue;
+                        let len = 1;
+                        while (c + len < COLS && board[r][c + len] === type) len++;
+                        if (len >= 3) {
+                            hasMatch = true;
+                            for (let i = 0; i < len; i++) matched[r][c + i] = true;
+                        }
+                        c += len - 1;
+                    }
+                }
+                // 垂直
+                for (let c = 0; c < COLS; c++) {
+                    for (let r = 0; r < ROWS - 2; r++) {
+                        const type = board[r][c];
+                        if (type === -1) continue;
+                        let len = 1;
+                        while (r + len < ROWS && board[r + len][c] === type) len++;
+                        if (len >= 3) {
+                            hasMatch = true;
+                            for (let i = 0; i < len; i++) matched[r + i][c] = true;
+                        }
+                        r += len - 1;
+                    }
+                }
+                if (!hasMatch) return [];
+                const result = [];
+                for (let r = 0; r < ROWS; r++)
+                    for (let c = 0; c < COLS; c++)
+                        if (matched[r][c]) result.push({ row: r, col: c, type: board[r][c] });
+                return result;
+            }
+
+            // ========== 动画状态机 ==========
+            function startRemoveAnimation(matches) {
+                matchesToRemove = matches;
+                removeAnimProgress = 0;
+                gameState = 'removing';
+            }
+
+            function finishRemoving() {
+                // 移除匹配的水果
+                for (const { row, col } of matchesToRemove) {
+                    board[row][col] = -1;
+                }
+                const removedCount = matchesToRemove.length;
+                score += removedCount * 10 * comboCount;
+                comboCount++;
+                updateUI();
+                if (comboCount >= 3) sfxCombo();
+                else sfxMatch();
+
+                // 下落填充
+                applyGravity();
+                if (moveList.length > 0) {
+                    moveAnimProgress = 0;
+                    gameState = 'moving';
+                } else {
+                    // 没有需要移动的，直接检查新匹配
+                    checkAndHandleMatches();
+                }
+            }
+
+            function applyGravity() {
+                moveList = [];
+                for (let c = 0; c < COLS; c++) {
+                    let writeRow = ROWS - 1;
+                    for (let r = ROWS - 1; r >= 0; r--) {
+                        if (board[r][c] !== -1) {
+                            if (r !== writeRow) {
+                                moveList.push({ fromRow: r, fromCol: c, toRow: writeRow, toCol: c, type: board[r][c] });
+                                board[writeRow][c] = board[r][c];
+                                board[r][c] = -1;
+                            }
+                            writeRow--;
+                        }
+                    }
+                    // 填充顶部空位
+                    for (let r = writeRow; r >= 0; r--) {
+                        const newType = Math.floor(Math.random() * NUM_TYPES);
+                        board[r][c] = newType;
+                        moveList.push({ fromRow: r - (writeRow + 1), fromCol: c, toRow: r, toCol: c, type: newType,
+                            isNew: true });
+                    }
+                }
+            }
+
+            function finishMoving() {
+                moveList = [];
+                checkAndHandleMatches();
+            }
+
+            function checkAndHandleMatches() {
+                const matches = findAllMatches();
+                if (matches.length > 0) {
+                    startRemoveAnimation(matches);
+                } else {
+                    gameState = 'idle';
+                    comboCount = 0;
+                    updateUI();
+                }
+            }
+
+            function performSwap(r1, c1, r2, c2) {
+                // 交换board数据
+                const temp = board[r1][c1];
+                board[r1][c1] = board[r2][c2];
+                board[r2][c2] = temp;
+                const matches = findAllMatches();
+                if (matches.length > 0) {
+                    sfxSwap();
+                    startRemoveAnimation(matches);
+                    return true;
+                } else {
+                    // 交换回去
+                    board[r2][c2] = board[r1][c1];
+                    board[r1][c1] = temp;
+                    sfxInvalid();
+                    return false;
+                }
+            }
+
+            function trySwapAdjacent(cell1, cell2) {
+                if (!cell1 || !cell2) return;
+                const dr = Math.abs(cell1.row - cell2.row);
+                const dc = Math.abs(cell1.col - cell2.col);
+                if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+                    performSwap(cell1.row, cell1.col, cell2.row, cell2.col);
+                }
+            }
+
+            function updateUI() {
+                scoreDisplay.textContent = score;
+                comboDisplay.textContent = 'x' + Math.max(1, comboCount);
+            }
+
+            // ========== 绘制 ==========
+            function drawBoard() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // 背景玻璃板
+                ctx.fillStyle = 'rgba(15, 22, 40, 0.6)';
+                ctx.beginPath();
+                ctx.roundRect(0, 0, canvas.width, canvas.height, 20);
+                ctx.fill();
+
+                // 网格线
+                ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= COLS; i++) {
+                    const x = i * CELL_SIZE;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                for (let i = 0; i <= ROWS; i++) {
+                    const y = i * CELL_SIZE;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+
+                // 绘制水果
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const type = board[r][c];
+                        if (type === -1) continue;
+                        const cx = c * CELL_SIZE + CELL_SIZE / 2;
+                        const cy = r * CELL_SIZE + CELL_SIZE / 2;
+                        const radius = CELL_SIZE * 0.38;
+                        drawCrystalFruit(cx, cy, radius, type);
+                    }
+                }
+
+                // 绘制选中高亮
+                if (selectedCell && gameState === 'idle') {
+                    const { row, col } = selectedCell;
+                    const x = col * CELL_SIZE;
+                    const y = row * CELL_SIZE;
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = 'rgba(255,255,255,0.8)';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.roundRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4, 8);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+
+                // 移除动画中的水果（缩放消失）
+                if (gameState === 'removing') {
+                    for (const { row, col } of matchesToRemove) {
+                        const cx = col * CELL_SIZE + CELL_SIZE / 2;
+                        const cy = row * CELL_SIZE + CELL_SIZE / 2;
+                        const scale = 1 - removeAnimProgress;
+                        const radius = CELL_SIZE * 0.38 * scale;
+                        if (radius > 0.5) {
+                            ctx.globalAlpha = scale;
+                            drawCrystalFruit(cx, cy, radius, board[row][col]);
+                            ctx.globalAlpha = 1;
+                        }
+                    }
+                }
+
+                // 移动动画
+                if (gameState === 'moving') {
+                    for (const mv of moveList) {
+                        const fromX = mv.fromCol * CELL_SIZE + CELL_SIZE / 2;
+                        const fromY = mv.fromRow * CELL_SIZE + CELL_SIZE / 2;
+                        const toX = mv.toCol * CELL_SIZE + CELL_SIZE / 2;
+                        const toY = mv.toRow * CELL_SIZE + CELL_SIZE / 2;
+                        const t = Math.min(1, moveAnimProgress);
+                        const curX = fromX + (toX - fromX) * t;
+                        const curY = fromY + (toY - fromY) * t;
+                        drawCrystalFruit(curX, curY, CELL_SIZE * 0.38, mv.type);
+                    }
+                }
+            }
+
+            function drawCrystalFruit(cx, cy, radius, type) {
+                if (type === undefined || type === -1) return;
+                const color = FRUIT_COLORS[type];
+                const highlight = FRUIT_HIGHLIGHTS[type];
+
+                // 外发光
+                ctx.shadowColor = color;
+                ctx.shadowBlur = radius * 0.6;
+                // 主体球体
+                const gradient = ctx.createRadialGradient(cx - radius * 0.25, cy - radius * 0.3, radius * 0.1, cx, cy,
+                radius);
+                gradient.addColorStop(0, highlight);
+                gradient.addColorStop(0.5, color);
+                gradient.addColorStop(1, '#2a1a3a');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // 高光点
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.beginPath();
+                ctx.arc(cx - radius * 0.3, cy - radius * 0.35, radius * 0.22, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 内部小光点
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.beginPath();
+                ctx.arc(cx + radius * 0.15, cy - radius * 0.2, radius * 0.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 底部反光
+                ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                ctx.beginPath();
+                ctx.ellipse(cx - radius * 0.1, cy + radius * 0.45, radius * 0.5, radius * 0.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // ========== 游戏循环 ==========
+            let lastTime = 0;
+            function gameLoop(timestamp) {
+                if (!lastTime) lastTime = timestamp;
+                const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+                lastTime = timestamp;
+
+                if (gameState === 'removing') {
+                    removeAnimProgress += dt * 4; // 0.25秒完成
+                    if (removeAnimProgress >= 1) {
+                        removeAnimProgress = 0;
+                        finishRemoving();
+                    }
+                } else if (gameState === 'moving') {
+                    moveAnimProgress += dt * 5; // 0.2秒完成
+                    if (moveAnimProgress >= 1) {
+                        moveAnimProgress = 0;
+                        finishMoving();
+                    }
+                }
+
+                drawBoard();
+                requestAnimationFrame(gameLoop);
+            }
+
+            // ========== 触摸/鼠标交互 ==========
+            let touchStartCell = null;
+            let touchCurrentCell = null;
+            let isDragging = false;
+
+            function handleStart(clientX, clientY) {
+                if (gameState !== 'idle') return;
+                const cell = getCellFromPoint(clientX, clientY);
+                if (cell) {
+                    touchStartCell = cell;
+                    touchCurrentCell = cell;
+                    isDragging = false;
+                    selectedCell = cell;
+                }
+            }
+
+            function handleMove(clientX, clientY) {
+                if (!touchStartCell || gameState !== 'idle') return;
+                const cell = getCellFromPoint(clientX, clientY);
+                if (cell && (cell.row !== touchStartCell.row || cell.col !== touchStartCell.col)) {
+                    touchCurrentCell = cell;
+                    isDragging = true;
+                    // 检查是否滑动到相邻格子
+                    const dr = Math.abs(cell.row - touchStartCell.row);
+                    const dc = Math.abs(cell.col - touchStartCell.col);
+                    if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+                        // 触发交换
+                        trySwapAdjacent(touchStartCell, cell);
+                        touchStartCell = null;
+                        touchCurrentCell = null;
+                        selectedCell = null;
+                        isDragging = false;
+                    }
+                }
+            }
+
+            function handleEnd() {
+                if (!isDragging && touchStartCell && gameState === 'idle') {
+                    // 点击选中，如果再点击相邻则交换
+                    if (selectedCell && touchCurrentCell &&
+                        (selectedCell.row !== touchCurrentCell.row || selectedCell.col !== touchCurrentCell.col)) {
+                        trySwapAdjacent(selectedCell, touchCurrentCell);
+                        selectedCell = null;
+                    }
+                }
+                touchStartCell = null;
+                touchCurrentCell = null;
+                isDragging = false;
+                if (gameState !== 'idle') selectedCell = null;
+            }
+
+            // 鼠标事件
+            canvas.addEventListener('mousedown', e => {
+                e.preventDefault();
+                initAudio();
+                handleStart(e.clientX, e.clientY);
+            });
+            window.addEventListener('mousemove', e => {
+                if (touchStartCell) handleMove(e.clientX, e.clientY);
+            });
+            window.addEventListener('mouseup', e => {
+                handleEnd();
+            });
+
+            // 触摸事件
+            canvas.addEventListener('touchstart', e => {
+                e.preventDefault();
+                initAudio();
+                const touch = e.touches[0];
+                handleStart(touch.clientX, touch.clientY);
+            }, { passive: false });
+            canvas.addEventListener('touchmove', e => {
+                e.preventDefault();
+                if (touchStartCell && e.touches.length > 0) {
+                    const touch = e.touches[0];
+                    handleMove(touch.clientX, touch.clientY);
+                }
+            }, { passive: false });
+            canvas.addEventListener('touchend', e => {
+                e.preventDefault();
+                handleEnd();
+            });
+            canvas.addEventListener('touchcancel', e => {
+                handleEnd();
+            });
+
+            // ========== 全屏功能 ==========
+            function isFullscreen() {
+                return !!(document.fullscreenElement || document.webkitFullscreenElement);
+            }
+
+            function requestFullscreen() {
+                const el = document.documentElement;
+                if (el.requestFullscreen) {
+                    el.requestFullscreen();
+                } else if (el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                }
+            }
+
+            function exitFullscreen() {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+
+            function toggleFullscreen() {
+                if (isFullscreen()) {
+                    exitFullscreen();
+                } else {
+                    requestFullscreen();
+                }
+            }
+
+            function updateFullscreenIconUI() {
+                const full = isFullscreen();
+                if (full) {
+                    fullscreenIcon.innerHTML = `
+                        <polyline points="4 8 8 4 4 4 4 8"></polyline>
+                        <polyline points="20 8 16 4 20 4 20 8"></polyline>
+                        <polyline points="20 16 16 20 20 20 20 16"></polyline>
+                        <polyline points="4 16 8 20 4 20 4 16"></polyline>
+                    `;
+                } else {
+                    fullscreenIcon.innerHTML = `
+                        <polyline points="8 3 3 3 3 8"></polyline>
+                        <polyline points="16 3 21 3 21 8"></polyline>
+                        <polyline points="21 16 21 21 16 21"></polyline>
+                        <polyline points="3 16 3 21 8 21"></polyline>
+                    `;
+                }
+            }
+
+            btnFullscreen.addEventListener('click', (e) => {
+                e.stopPropagation();
+                initAudio();
+                toggleFullscreen();
+            });
+
+            document.addEventListener('fullscreenchange', updateFullscreenIconUI);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenIconUI);
+            updateFullscreenIconUI();
+
+            // 音效按钮
+            btnSound.addEventListener('click', (e) => {
+                e.stopPropagation();
+                initAudio();
+                soundEnabled = !soundEnabled;
+                updateSoundIcon();
+                if (soundEnabled && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            });
+
+            // ========== 启动 ==========
+            function init() {
+                resizeCanvas();
+                initBoard();
+                score = 0;
+                comboCount = 0;
+                gameState = 'idle';
+                selectedCell = null;
+                matchesToRemove = [];
+                moveList = [];
+                updateUI();
+                updateSoundIcon();
+                updateFullscreenIconUI();
+                lastTime = 0;
+            }
+
+            init();
+            requestAnimationFrame(gameLoop);
+
+            console.log('💎 水晶果园已就绪！');
+            console.log('  🖱️ 滑动/拖拽交换相邻水果');
+            console.log('  ✨ 三个以上相同水果消除');
+            console.log('  🔥 连续消除触发连击加分');
+            console.log('  📱 全屏按钮适配iOS Safari');
+        })();
+    </script>
+</body>
+</html>

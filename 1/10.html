@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=yes">
+  <title>律动之境 · 甜蜜悠扬</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0015;
+      font-family: 'Segoe UI', 'PingFang SC', system-ui, sans-serif;
+    }
+    .game-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      width: 100dvw;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at center, #1a0a2e 0%, #050010 100%);
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .fullscreen-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      background: rgba(30, 20, 50, 0.5);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 220, 240, 0.9);
+      font-size: 28px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,200,255,0.15);
+      z-index: 100;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: none;
+      line-height: 1;
+      padding: 0;
+    }
+    .fullscreen-btn:active {
+      transform: scale(0.9);
+      background: rgba(60, 40, 80, 0.6);
+    }
+    @media (max-width: 600px) {
+      .fullscreen-btn {
+        width: 44px;
+        height: 44px;
+        bottom: 16px;
+        right: 16px;
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container" id="gameContainer">
+    <canvas id="artCanvas"></canvas>
+    <button class="fullscreen-btn" id="fullscreenToggle" title="全屏模式">⛶</button>
+  </div>
+  <script>
+    (function() {
+      const canvas = document.getElementById('artCanvas');
+      const ctx = canvas.getContext('2d');
+      const TOTAL_LEVELS = 999;
+      
+      let currentLevel = 0;
+      let gameState = 'playing';
+      let levelMessage = '';
+      let messageTimer = 0;
+      
+      let player = { x: 0, y: 0, radius: 22, color: '#fff5f0' };
+      let goal = { x: 0, y: 0, radius: 30, color: '#ffb3d9', symbolType: 'circle' };
+      let elements = [];
+      
+      let backgroundParticles = [];
+      let trailParticles = [];
+      let ambientParticles = [];
+      let burstParticles = [];
+      
+      let pointerActive = false;
+      let pointerX = 0, pointerY = 0;
+      let time = 0;
+      
+      let audioCtx = null;
+      let masterGain = null;
+      let currentBgMusic = null;
+      let bgGainNode = null;
+      let sfxBuffers = {};
+      
+      function initAudio() {
+        if (audioCtx) return;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0.35;
+          masterGain.connect(audioCtx.destination);
+          generateSfxBuffers();
+        } catch (e) {
+          console.warn('音频不可用', e);
+        }
+      }
+      
+      function generateSfxBuffers() {
+        if (!audioCtx) return;
+        const sr = audioCtx.sampleRate;
+        
+        function createSweetTone(freq, duration, harmonics = 3) {
+          const len = sr * duration;
+          const buf = audioCtx.createBuffer(1, len, sr);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < len; i++) {
+            const t = i / sr;
+            let sample = 0;
+            for (let h = 1; h <= harmonics; h++) {
+              sample += Math.sin(2 * Math.PI * freq * h * t) * (1 / (h * 1.3));
+            }
+            const envelope = Math.exp(-t * 6) * 0.55;
+            data[i] = sample * envelope;
+          }
+          return buf;
+        }
+        
+        sfxBuffers.collect = createSweetTone(1047, 0.2, 4);
+        sfxBuffers.levelComplete = createSweetTone(1319, 0.7, 5);
+        sfxBuffers.collision = createSweetTone(349, 0.35, 2);
+      }
+      
+      function playSfx(buffer, vol = 0.45) {
+        if (!audioCtx || !buffer) return;
+        const src = audioCtx.createBufferSource();
+        src.buffer = buffer;
+        const gain = audioCtx.createGain();
+        gain.gain.value = vol;
+        src.connect(gain).connect(masterGain);
+        src.start(0);
+      }
+      
+      function stopBg() {
+        if (currentBgMusic) {
+          try { currentBgMusic.stop(); } catch(e) {}
+          currentBgMusic = null;
+        }
+        if (bgGainNode) { bgGainNode.disconnect(); bgGainNode = null; }
+      }
+      
+      function startLevelMusic(level) {
+        if (!audioCtx) return;
+        stopBg();
+        bgGainNode = audioCtx.createGain();
+        bgGainNode.gain.value = 0.22;
+        bgGainNode.connect(masterGain);
+        
+        const oscillators = [];
+        const now = audioCtx.currentTime;
+        
+        const sweetScales = [
+          [261.63, 293.66, 329.63, 392, 440],
+          [293.66, 329.63, 369.99, 440, 493.88],
+          [329.63, 369.99, 415.30, 493.88, 554.37],
+          [349.23, 392, 440, 523.25, 587.33],
+          [392, 440, 493.88, 587.33, 659.25],
+          [440, 493.88, 554.37, 659.25, 739.99],
+        ];
+        
+        const scaleIdx = level % sweetScales.length;
+        const scale = sweetScales[scaleIdx];
+        const root = scale[0];
+        const third = scale[2];
+        const fifth = scale[4];
+        const highRoot = root * 2;
+        
+        const pad = audioCtx.createOscillator();
+        pad.type = 'sine';
+        pad.frequency.value = root / 2;
+        const padGain = audioCtx.createGain();
+        padGain.gain.value = 0.14;
+        padGain.gain.linearRampToValueAtTime(0.17, now + 3);
+        pad.connect(padGain).connect(bgGainNode);
+        pad.start();
+        oscillators.push(pad);
+        
+        const melody = audioCtx.createOscillator();
+        melody.type = 'sine';
+        melody.frequency.value = root;
+        const melodyGain = audioCtx.createGain();
+        melodyGain.gain.value = 0.11;
+        melodyGain.gain.linearRampToValueAtTime(0.14, now + 2.5);
+        melody.connect(melodyGain).connect(bgGainNode);
+        melody.start();
+        oscillators.push(melody);
+        
+        const harmony = audioCtx.createOscillator();
+        harmony.type = 'sine';
+        harmony.frequency.value = third;
+        const harmonyGain = audioCtx.createGain();
+        harmonyGain.gain.value = 0.08;
+        harmonyGain.gain.linearRampToValueAtTime(0.11, now + 4);
+        harmony.connect(harmonyGain).connect(bgGainNode);
+        harmony.start();
+        oscillators.push(harmony);
+        
+        const sparkle = audioCtx.createOscillator();
+        sparkle.type = 'sine';
+        sparkle.frequency.value = fifth;
+        const sparkleGain = audioCtx.createGain();
+        sparkleGain.gain.value = 0.05;
+        sparkleGain.gain.linearRampToValueAtTime(0.08, now + 5);
+        sparkle.connect(sparkleGain).connect(bgGainNode);
+        sparkle.start();
+        oscillators.push(sparkle);
+        
+        if (level % 3 === 0) {
+          const dream = audioCtx.createOscillator();
+          dream.type = 'sine';
+          dream.frequency.value = highRoot;
+          const dreamGain = audioCtx.createGain();
+          dreamGain.gain.value = 0.03;
+          dreamGain.gain.linearRampToValueAtTime(0.06, now + 6);
+          dream.connect(dreamGain).connect(bgGainNode);
+          dream.start();
+          oscillators.push(dream);
+        }
+        
+        const lfo = audioCtx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.12 + (level % 5) * 0.08;
+        const lfoGain = audioCtx.createGain();
+        lfoGain.gain.value = 1.5;
+        lfo.connect(lfoGain).connect(melody.frequency);
+        lfo.start();
+        oscillators.push(lfo);
+        
+        const lfo2 = audioCtx.createOscillator();
+        lfo2.type = 'sine';
+        lfo2.frequency.value = 0.18;
+        const lfo2Gain = audioCtx.createGain();
+        lfo2Gain.gain.value = 1.2;
+        lfo2.connect(lfo2Gain).connect(harmony.frequency);
+        lfo2.start();
+        oscillators.push(lfo2);
+        
+        currentBgMusic = { stop: () => oscillators.forEach(o => { try { o.stop(); } catch(e){} }) };
+      }
+      
+      function initBackgroundParticles() {
+        backgroundParticles = [];
+        const count = Math.floor((canvas.width * canvas.height) / 2800);
+        for (let i = 0; i < count; i++) {
+          backgroundParticles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            radius: Math.random() * 2.5 + 0.6,
+            vx: (Math.random() - 0.5) * 0.35,
+            vy: (Math.random() - 0.5) * 0.35,
+            life: Math.random(),
+            maxLife: Math.random() * 0.8 + 0.4,
+            hue: (currentLevel * 37 + Math.random() * 50) % 360,
+            alpha: Math.random() * 0.65 + 0.35,
+            twinkle: Math.random() * Math.PI * 2
+          });
+        }
+      }
+      
+      function loadLevel(level) {
+        elements = [];
+        trailParticles = [];
+        ambientParticles = [];
+        burstParticles = [];
+        gameState = 'playing';
+        levelMessage = '';
+        messageTimer = 0;
+        
+        player.x = canvas.width / 2;
+        player.y = canvas.height * 0.78;
+        goal.x = canvas.width / 2;
+        goal.y = canvas.height * 0.16;
+        
+        const hue = (level * 41) % 360;
+        goal.color = `hsl(${(hue + 330) % 360}, 90%, 75%)`;
+        player.color = `hsl(${(hue + 20) % 360}, 75%, 88%)`;
+        goal.symbolType = level % 4 === 0 ? 'sun' : (level % 4 === 1 ? 'moon' : (level % 4 === 2 ? 'star' : 'crystal'));
+        
+        const numCollect = 4 + (level % 5);
+        const numEnemy = 3 + (level % 4);
+        
+        for (let i = 0; i < numCollect; i++) {
+          elements.push({
+            x: canvas.width * (0.15 + Math.random() * 0.7),
+            y: canvas.height * (0.22 + Math.random() * 0.55),
+            radius: 13,
+            color: `hsl(${(hue + 60) % 360}, 85%, 72%)`,
+            collected: false,
+            type: 'collect',
+            pulse: Math.random() * Math.PI * 2,
+            glowHue: (hue + 60) % 360
+          });
+        }
+        
+        for (let i = 0; i < numEnemy; i++) {
+          if (level % 6 === 0) {
+            elements.push({
+              x: canvas.width * (0.22 + i * 0.25),
+              y: canvas.height * 0.45,
+              radius: 17,
+              color: `hsl(${(hue + 180) % 360}, 75%, 55%)`,
+              type: 'enemy',
+              angle: i * Math.PI * 0.7,
+              orbitRadius: 65 + (level % 35),
+              centerX: canvas.width * (0.22 + i * 0.25),
+              centerY: canvas.height * 0.45,
+              glowHue: (hue + 180) % 360
+            });
+          } else {
+            elements.push({
+              x: canvas.width * (0.12 + i * 0.35),
+              y: canvas.height * (0.28 + Math.random() * 0.45),
+              radius: 16,
+              color: `hsl(${(hue + 180) % 360}, 70%, 58%)`,
+              vx: (Math.random() - 0.5) * 2.8,
+              vy: (Math.random() - 0.5) * 2.8,
+              type: 'enemy',
+              glowHue: (hue + 180) % 360
+            });
+          }
+        }
+        
+        initBackgroundParticles();
+        startLevelMusic(level);
+        pointerX = player.x;
+        pointerY = player.y;
+      }
+      
+      function checkComplete() {
+        if (gameState !== 'playing') return;
+        const collectibles = elements.filter(e => e.type === 'collect' && !e.collected);
+        const distGoal = Math.hypot(player.x - goal.x, player.y - goal.y);
+        if (collectibles.length === 0 && distGoal < goal.radius + player.radius) {
+          gameState = 'levelComplete';
+          levelMessage = '✦ 甜蜜升华 ✦';
+          messageTimer = 120;
+          playSfx(sfxBuffers.levelComplete, 0.55);
+          for (let i = 0; i < 70; i++) {
+            burstParticles.push({
+              x: player.x,
+              y: player.y,
+              radius: Math.random() * 6 + 2,
+              vx: (Math.random() - 0.5) * 8,
+              vy: (Math.random() - 0.5) * 8,
+              life: 1.2,
+              hue: (currentLevel * 41 + Math.random() * 70) % 360
+            });
+          }
+          setTimeout(() => {
+            currentLevel = (currentLevel + 1) % TOTAL_LEVELS;
+            resizeAndLoad();
+          }, 1600);
+        }
+      }
+      
+      function gameOverCheck() {
+        if (gameState !== 'playing') return;
+        for (let e of elements) {
+          if (e.type === 'enemy' && Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.radius) {
+            gameState = 'gameOver';
+            levelMessage = '温柔重聚';
+            messageTimer = 90;
+            playSfx(sfxBuffers.collision, 0.5);
+            for (let i = 0; i < 45; i++) {
+              burstParticles.push({
+                x: player.x,
+                y: player.y,
+                radius: Math.random() * 5 + 1.5,
+                vx: (Math.random() - 0.5) * 7,
+                vy: (Math.random() - 0.5) * 7,
+                life: 0.9,
+                hue: 340
+              });
+            }
+            setTimeout(() => resizeAndLoad(), 1200);
+            break;
+          }
+        }
+      }
+      
+      function resizeAndLoad() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        loadLevel(currentLevel);
+      }
+      
+      function update() {
+        time += 0.016;
+        if (gameState !== 'playing') {
+          if (messageTimer > 0) messageTimer--;
+          for (let p of backgroundParticles) {
+            p.x += p.vx;
+            p.y += p.vy;
+            if (p.x < 0) p.x = canvas.width;
+            if (p.x > canvas.width) p.x = 0;
+            if (p.y < 0) p.y = canvas.height;
+            if (p.y > canvas.height) p.y = 0;
+            p.twinkle += 0.04;
+          }
+          burstParticles = burstParticles.filter(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.025;
+            p.radius *= 0.98;
+            return p.life > 0;
+          });
+          return;
+        }
+        
+        if (pointerActive) {
+          const dx = pointerX - player.x, dy = pointerY - player.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 1.5) {
+            player.x += dx * 0.1;
+            player.y += dy * 0.1;
+            if (dist > 3) {
+              for (let i = 0; i < 5; i++) {
+                trailParticles.push({
+                  x: player.x + (Math.random() - 0.5) * 16,
+                  y: player.y + (Math.random() - 0.5) * 16,
+                  radius: Math.random() * 7 + 3,
+                  vx: (Math.random() - 0.5) * 1.3,
+                  vy: (Math.random() - 0.5) * 1.3 - 0.9,
+                  life: 0.95,
+                  hue: (currentLevel * 41 + Math.random() * 50) % 360
+                });
+              }
+            }
+          }
+        }
+        player.x = Math.min(Math.max(player.x, player.radius), canvas.width - player.radius);
+        player.y = Math.min(Math.max(player.y, player.radius), canvas.height - player.radius);
+        
+        for (let e of elements) {
+          if (e.type === 'enemy') {
+            if (e.orbitRadius) {
+              e.angle += 0.022;
+              e.x = e.centerX + Math.cos(e.angle) * e.orbitRadius;
+              e.y = e.centerY + Math.sin(e.angle) * e.orbitRadius;
+            } else {
+              e.x += e.vx;
+              e.y += e.vy;
+              if (e.x < e.radius || e.x > canvas.width - e.radius) e.vx *= -1;
+              if (e.y < e.radius || e.y > canvas.height - e.radius) e.vy *= -1;
+            }
+          }
+          if (e.pulse !== undefined) e.pulse += 0.08;
+        }
+        
+        for (let e of elements) {
+          if (e.type === 'collect' && !e.collected && Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.radius) {
+            e.collected = true;
+            playSfx(sfxBuffers.collect, 0.45);
+            for (let i = 0; i < 30; i++) {
+              ambientParticles.push({
+                x: e.x, y: e.y,
+                radius: Math.random() * 6 + 2.5,
+                vx: (Math.random() - 0.5) * 6,
+                vy: (Math.random() - 0.5) * 6,
+                life: 1.1,
+                hue: e.glowHue
+              });
+            }
+          }
+        }
+        
+        trailParticles = trailParticles.filter(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= 0.018;
+          p.radius *= 0.98;
+          return p.life > 0;
+        });
+        
+        ambientParticles = ambientParticles.filter(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= 0.016;
+          return p.life > 0;
+        });
+        
+        for (let p of backgroundParticles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0) p.x = canvas.width;
+          if (p.x > canvas.width) p.x = 0;
+          if (p.y < 0) p.y = canvas.height;
+          if (p.y > canvas.height) p.y = 0;
+          p.life += 0.005;
+          if (p.life > p.maxLife) p.life = 0;
+          p.twinkle += 0.035;
+        }
+        
+        if (Math.random() < 0.8) {
+          ambientParticles.push({
+            x: player.x + (Math.random() - 0.5) * 75,
+            y: player.y + (Math.random() - 0.5) * 75,
+            radius: Math.random() * 3.5 + 1.2,
+            vx: (Math.random() - 0.5) * 1,
+            vy: (Math.random() - 0.5) * 1 - 0.7,
+            life: 0.8,
+            hue: (currentLevel * 41) % 360
+          });
+        }
+        
+        checkComplete();
+        gameOverCheck();
+      }
+      
+      function drawGlowingCircle(x, y, radius, color, glowSize, glowAlpha) {
+        // 减少光晕层数，使用更紧凑的光晕范围，让球体更清晰
+        for (let i = 2; i >= 0; i--) {
+          const glowRadius = radius + (i * glowSize * 0.3);
+          const alpha = glowAlpha * (0.22 - i * 0.06);
+          const gradient = ctx.createRadialGradient(x, y, radius * 0.5, x, y, glowRadius);
+          gradient.addColorStop(0, color);
+          gradient.addColorStop(0.6, color.replace(')', `, ${alpha * 1.2})`).replace('hsl', 'hsla'));
+          gradient.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      
+      function drawStar(cx, cy, or, ir, pts) {
+        const step = Math.PI / pts;
+        ctx.beginPath();
+        for (let i = 0; i < 2 * pts; i++) {
+          const r = i % 2 === 0 ? or : ir;
+          const a = i * step - Math.PI / 2;
+          const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+      }
+      
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const h = (currentLevel * 41) % 360;
+        const bgGrad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.8);
+        bgGrad.addColorStop(0, `hsla(${(h + 300) % 360}, 35%, 15%, 1)`);
+        bgGrad.addColorStop(0.5, `hsla(${(h + 320) % 360}, 30%, 8%, 1)`);
+        bgGrad.addColorStop(1, `hsla(${(h + 340) % 360}, 25%, 4%, 1)`);
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        for (let p of backgroundParticles) {
+          const twinkle = Math.sin(p.twinkle) * 0.5 + 0.5;
+          const alpha = Math.sin(p.life * Math.PI / p.maxLife) * p.alpha * twinkle;
+          ctx.fillStyle = `hsla(${p.hue}, 80%, 82%, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        for (let p of burstParticles) {
+          const alpha = p.life * 0.85;
+          ctx.fillStyle = `hsla(${p.hue}, 85%, 75%, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        for (let p of ambientParticles) {
+          const alpha = p.life * 0.85;
+          ctx.fillStyle = `hsla(${p.hue}, 85%, 80%, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        for (let p of trailParticles) {
+          const alpha = p.life * 0.65;
+          ctx.fillStyle = `hsla(${p.hue}, 90%, 85%, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        // 绘制目标球 - 更清晰的光晕
+        ctx.save();
+        drawGlowingCircle(goal.x, goal.y, goal.radius, goal.color, 16, 0.5);
+        ctx.fillStyle = goal.color;
+        ctx.shadowColor = goal.color;
+        ctx.shadowBlur = 20;
+        if (goal.symbolType === 'sun') {
+          ctx.beginPath(); ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(goal.x, goal.y, goal.radius * 0.5, 0, Math.PI * 2); ctx.fill();
+        } else if (goal.symbolType === 'moon') {
+          ctx.beginPath(); ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = `hsla(${h}, 30%, 15%, 1)`; ctx.beginPath(); ctx.arc(goal.x + 7, goal.y - 4, goal.radius * 0.6, 0, Math.PI * 2); ctx.fill();
+        } else if (goal.symbolType === 'crystal') {
+          ctx.beginPath(); ctx.moveTo(goal.x, goal.y - goal.radius); ctx.lineTo(goal.x + goal.radius * 0.7, goal.y); ctx.lineTo(goal.x, goal.y + goal.radius); ctx.lineTo(goal.x - goal.radius * 0.7, goal.y); ctx.closePath(); ctx.fill();
+        } else {
+          drawStar(goal.x, goal.y, goal.radius, goal.radius * 0.45, 5); ctx.fill();
+        }
+        // 清晰的高光点
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(goal.x - 4, goal.y - 4, goal.radius * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
+        // 绘制元素球 - 更清晰
+        for (let e of elements) {
+          if (e.type === 'collect' && e.collected) continue;
+          ctx.save();
+          const pulse = e.pulse ? Math.sin(e.pulse) * 0.2 + 0.8 : 1;
+          const currentRadius = e.radius * pulse;
+          drawGlowingCircle(e.x, e.y, currentRadius, e.color, 14, 0.45);
+          ctx.fillStyle = e.color;
+          ctx.shadowColor = e.color;
+          ctx.shadowBlur = 16;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, currentRadius, 0, Math.PI * 2);
+          ctx.fill();
+          // 清晰高光
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(e.x - currentRadius * 0.22, e.y - currentRadius * 0.22, currentRadius * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        
+        // 绘制玩家球 - 更清晰
+        ctx.save();
+        drawGlowingCircle(player.x, player.y, player.radius, player.color, 18, 0.55);
+        const coreGrad = ctx.createRadialGradient(player.x, player.y, player.radius * 0.2, player.x, player.y, player.radius);
+        coreGrad.addColorStop(0, '#ffffff');
+        coreGrad.addColorStop(0.5, player.color);
+        coreGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        ctx.fill();
+        // 清晰高光
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(player.x - 3, player.y - 3, player.radius * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        
+        if (levelMessage) {
+          ctx.fillStyle = 'rgba(255,235,245,0.93)';
+          ctx.font = `bold ${Math.min(canvas.width / 10, 38)}px "PingFang SC"`;
+          ctx.textAlign = 'center';
+          ctx.shadowColor = 'rgba(0,0,0,0.6)';
+          ctx.shadowBlur = 28;
+          ctx.fillText(levelMessage, canvas.width / 2, canvas.height / 2);
+          ctx.shadowBlur = 0;
+        }
+        ctx.fillStyle = 'rgba(255,220,240,0.65)';
+        ctx.font = '15px "PingFang SC"';
+        ctx.fillText(`${currentLevel + 1} / ${TOTAL_LEVELS}`, canvas.width - 75, 32);
+      }
+      
+      function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+      
+      function handleDown(e) {
+        e.preventDefault();
+        initAudio();
+        const r = canvas.getBoundingClientRect();
+        const sx = canvas.width / r.width, sy = canvas.height / r.height;
+        const cx = e.touches ? e.touches[0].clientX : e.clientX;
+        const cy = e.touches ? e.touches[0].clientY : e.clientY;
+        pointerX = (cx - r.left) * sx;
+        pointerY = (cy - r.top) * sy;
+        pointerActive = true;
+      }
+      
+      function handleMove(e) {
+        if (!pointerActive) return;
+        e.preventDefault();
+        const r = canvas.getBoundingClientRect();
+        const sx = canvas.width / r.width, sy = canvas.height / r.height;
+        const cx = e.touches ? e.touches[0].clientX : e.clientX;
+        const cy = e.touches ? e.touches[0].clientY : e.clientY;
+        pointerX = (cx - r.left) * sx;
+        pointerY = (cy - r.top) * sy;
+      }
+      
+      function handleUp() {
+        pointerActive = false;
+      }
+      
+      canvas.addEventListener('touchstart', handleDown, { passive: false });
+      canvas.addEventListener('touchmove', handleMove, { passive: false });
+      canvas.addEventListener('touchend', handleUp);
+      canvas.addEventListener('mousedown', handleDown);
+      window.addEventListener('mousemove', (e) => { if (pointerActive) handleMove(e); });
+      window.addEventListener('mouseup', handleUp);
+      
+      document.getElementById('fullscreenToggle').addEventListener('click', () => {
+        const el = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          el.requestFullscreen ? el.requestFullscreen() : el.webkitRequestFullscreen();
+        } else {
+          document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen();
+        }
+      });
+      
+      window.addEventListener('resize', resizeAndLoad);
+      document.body.addEventListener('touchstart', initAudio, { once: true });
+      document.body.addEventListener('click', initAudio, { once: true });
+      
+      resizeAndLoad();
+      loop();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>🎣 深海垂钓</title>
+    <style>
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000a14;
+            font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            position: fixed;
+            top: 0;
+            left: 0;
+            touch-action: manipulation;
+            -webkit-overflow-scrolling: none;
+        }
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: block;
+            touch-action: manipulation;
+            cursor: pointer;
+        }
+        .ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+            padding-left: var(--safe-left);
+            padding-right: var(--safe-right);
+        }
+        .ui-layer>* {
+            pointer-events: auto;
+        }
+        .top-panel {
+            position: absolute;
+            top: calc(10px + var(--safe-top));
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: rgba(5, 20, 40, 0.75);
+            border-radius: 28px;
+            border: 1px solid rgba(100, 180, 255, 0.2);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+            z-index: 20;
+            white-space: nowrap;
+        }
+        .score-block {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #c8e8ff;
+            letter-spacing: 0.5px;
+        }
+        .score-block .lb {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: #6aa8d8;
+            letter-spacing: 1.5px;
+        }
+        .score-block .val {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #ffd740;
+            text-shadow: 0 0 12px rgba(255, 215, 64, 0.7);
+            min-width: 32px;
+            text-align: center;
+        }
+        .score-block .bst {
+            font-size: 0.7rem;
+            color: #5ce1e6;
+            text-shadow: 0 0 8px rgba(92, 225, 230, 0.5);
+            font-weight: 700;
+        }
+        .btn-set {
+            display: flex;
+            gap: 6px;
+            margin-left: 4px;
+        }
+        .circle-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(150, 200, 255, 0.3);
+            background: rgba(10, 30, 55, 0.7);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+            outline: none;
+            color: #fff;
+            font-size: 1rem;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+            z-index: 30;
+        }
+        .circle-btn:active {
+            transform: scale(0.85);
+            border-color: #fff;
+            box-shadow: 0 0 18px rgba(200, 220, 255, 0.5);
+        }
+        .circle-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: #c8ddf8;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
+        }
+        .bottom-tip {
+            position: absolute;
+            bottom: calc(18px + var(--safe-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(180, 210, 240, 0.5);
+            font-size: 0.65rem;
+            letter-spacing: 1.5px;
+            text-align: center;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div class="ui-layer">
+        <div class="top-panel">
+            <div class="score-block">
+                <span class="lb">得分</span>
+                <span class="val" id="scoreDisplay">0</span>
+            </div>
+            <div class="score-block">
+                <span class="lb">最佳</span>
+                <span class="bst" id="highScoreDisplay">0</span>
+            </div>
+            <div class="btn-set">
+                <button class="circle-btn" id="btnFullscreen" title="全屏" aria-label="全屏切换">
+                    <svg id="fullscreenIcon" viewBox="0 0 24 24">
+                        <polyline points="8 3 3 3 3 8"></polyline>
+                        <polyline points="16 3 21 3 21 8"></polyline>
+                        <polyline points="21 16 21 21 16 21"></polyline>
+                        <polyline points="3 16 3 21 8 21"></polyline>
+                    </svg>
+                </button>
+                <button class="circle-btn" id="btnSound" title="音效">
+                    <span id="soundIcon" style="font-size:0.85rem;">🔊</span>
+                </button>
+            </div>
+        </div>
+        <div class="bottom-tip" id="hintText">点击屏幕放下鱼钩 🎣</div>
+    </div>
+
+    <script>
+        (function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const highScoreDisplay = document.getElementById('highScoreDisplay');
+            const btnFullscreen = document.getElementById('btnFullscreen');
+            const btnSound = document.getElementById('btnSound');
+            const soundIcon = document.getElementById('soundIcon');
+            const fullscreenIcon = document.getElementById('fullscreenIcon');
+            const hintText = document.getElementById('hintText');
+
+            let W, H;
+            function resize() {
+                W = window.innerWidth;
+                H = window.innerHeight;
+                canvas.width = W;
+                canvas.height = H;
+            }
+            resize();
+            window.addEventListener('resize', resize);
+            window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+
+            let audioCtx = null;
+            let soundEnabled = true;
+            function initAudio() {
+                if (!audioCtx) {
+                    try { audioCtx = new(window.AudioContext || window.webkitAudioContext)(); } catch (e) {
+                        soundEnabled = false;
+                        updateSoundIcon();
+                        return;
+                    }
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+            }
+            function tone(f, t, d, v, g) {
+                if (!soundEnabled || !audioCtx) return;
+                v = v || 0.05;
+                try {
+                    const tm = audioCtx.currentTime;
+                    const o = audioCtx.createOscillator();
+                    const gn = audioCtx.createGain();
+                    o.type = t || 'sine';
+                    o.frequency.setValueAtTime(f, tm);
+                    if (g) o.frequency.linearRampToValueAtTime(g, tm + d);
+                    gn.gain.setValueAtTime(v, tm);
+                    gn.gain.exponentialRampToValueAtTime(0.0001, tm + d);
+                    o.connect(gn);
+                    gn.connect(audioCtx.destination);
+                    o.start(tm);
+                    o.stop(tm + d);
+                } catch (e) {}
+            }
+            function sfxCast() { tone(150, 'sine', 0.12, 0.04, 80); }
+            function sfxCatch() { tone(500, 'sine', 0.06, 0.05, 800);
+                tone(700, 'triangle', 0.04, 0.07); }
+            function sfxBigCatch() { tone(300, 'sine', 0.05, 0.06, 600);
+                tone(600, 'triangle', 0.04, 0.08, 900);
+                tone(900, 'sine', 0.03, 0.1); }
+            function sfxMiss() { tone(80, 'sawtooth', 0.15, 0.25, 40); }
+            function sfxRare() { tone(400, 'sine', 0.04, 0.06, 800);
+                tone(800, 'sine', 0.03, 0.08, 1200);
+                tone(1200, 'triangle', 0.02, 0.1); }
+            function updateSoundIcon() { soundIcon.textContent = soundEnabled ? '🔊' : '🔇'; }
+
+            let state = 'waiting';
+            let score = 0;
+            let highScore = 0;
+            let frame = 0;
+            let hookSwingAngle = 0;
+            let hookX = 0;
+            let hookY = 0;
+            let hookExtending = false;
+            let hookRetracting = false;
+            let hookSpeed = 0;
+            const HOOK_START_Y_RATIO = 0.13;
+            const HOOK_MAX_Y_RATIO = 0.88;
+            const HOOK_DOWN_SPEED = 10;
+            const HOOK_UP_SPEED = 6;
+            let caughtFish = null;
+            let hookCooldown = 0;
+            let fishes = [];
+            let bubbles = [];
+            let particles = [];
+            let seaweeds = [];
+            let popups = [];
+
+            function getHookStartY() { return H * HOOK_START_Y_RATIO; }
+            function getHookMaxY() { return H * HOOK_MAX_Y_RATIO; }
+            function getHookPivotX() { return W / 2; }
+            function getHookPivotY() { return H * 0.04; }
+
+            function resetHook() {
+                hookExtending = false;
+                hookRetracting = false;
+                hookSpeed = 0;
+                caughtFish = null;
+                hookCooldown = 0;
+                hookSwingAngle = 0;
+                updateHookPosition();
+            }
+
+            function updateHookPosition() {
+                const pivotX = getHookPivotX();
+                const pivotY = getHookPivotY();
+                if (!hookExtending && !hookRetracting && caughtFish === null) {
+                    const amp = W * 0.22;
+                    hookSwingAngle = Math.sin(frame * 0.025) * 0.7;
+                    hookX = pivotX + Math.sin(hookSwingAngle) * amp;
+                    hookY = getHookStartY();
+                } else if (hookExtending) {
+                    hookY += HOOK_DOWN_SPEED;
+                    hookX = pivotX + Math.sin(hookSwingAngle) * (W * 0.15) * (1 - (hookY - getHookStartY()) / (getHookMaxY() -
+                        getHookStartY()));
+                    if (hookY >= getHookMaxY()) {
+                        hookY = getHookMaxY();
+                        hookExtending = false;
+                        hookRetracting = true;
+                        sfxMiss();
+                    }
+                } else if (hookRetracting) {
+                    hookY -= HOOK_UP_SPEED;
+                    if (hookY <= getHookStartY()) {
+                        hookY = getHookStartY();
+                        hookRetracting = false;
+                        caughtFish = null;
+                        hookCooldown = 15;
+                    }
+                }
+                if (caughtFish && hookRetracting) {
+                    caughtFish.x = hookX;
+                    caughtFish.y = hookY - 18;
+                }
+            }
+
+            function castHook() {
+                if (hookExtending || hookRetracting || hookCooldown > 0) return;
+                if (state === 'waiting') { state = 'playing';
+                    hintText.textContent = '点击放下鱼钩 · 抓鱼得分'; }
+                hookExtending = true;
+                hookRetracting = false;
+                caughtFish = null;
+                hookSpeed = HOOK_DOWN_SPEED;
+                sfxCast();
+                spawnBubbles(hookX, hookY, 6);
+            }
+
+            function initFishes() {
+                fishes = [];
+                for (let i = 0; i < 8; i++) spawnFish();
+            }
+
+            function spawnFish() {
+                const types = [
+                    { name: 'clown', color: '#ff6b6b', w: 36, h: 20, score: 15, speed: 1.5 + Math.random() * 2 },
+                    { name: 'blue', color: '#4dabf7', w: 44, h: 24, score: 25, speed: 1 + Math.random() * 1.8 },
+                    { name: 'yellow', color: '#ffd43b', w: 30, h: 16, score: 20, speed: 1.8 + Math.random() * 2.2 },
+                    { name: 'green', color: '#69db7c', w: 50, h: 28, score: 40, speed: 0.7 + Math.random() * 1.4 },
+                    { name: 'purple', color: '#cc5de8', w: 38, h: 22, score: 35, speed: 1.2 + Math.random() * 1.6 },
+                    { name: 'gold', color: '#ffa94d', w: 42, h: 24, score: 80, speed: 1.4 + Math.random() * 2,
+                    rare: true },
+                    { name: 'shark', color: '#878b91', w: 65, h: 32, score: 150, speed: 2.5 + Math.random() * 3,
+                    rare: true },
+                ];
+                const type = Math.random() < 0.12 ? types[5] : (Math.random() < 0.08 ? types[6] : types[Math.floor(Math
+                    .random() * 5)]);
+                const fromLeft = Math.random() < 0.55;
+                const margin = type.w + 20;
+                const x = fromLeft ? -margin : W + margin;
+                const yMin = H * 0.2;
+                const yMax = H * 0.82;
+                const y = yMin + Math.random() * (yMax - yMin);
+                const dir = fromLeft ? 1 : -1;
+                const speed = type.speed * (0.7 + Math.random() * 0.6);
+                fishes.push({
+                    x,
+                    y,
+                    w: type.w,
+                    h: type.h,
+                    color: type.color,
+                    name: type.name,
+                    score: type.score,
+                    speed,
+                    dir,
+                    rare: type.rare || false,
+                    tailPhase: Math.random() * Math.PI * 2,
+                    alive: true,
+                });
+            }
+
+            function spawnBubbles(x, y, count) {
+                for (let i = 0; i < count; i++) {
+                    bubbles.push({
+                        x: x + (Math.random() - 0.5) * 40,
+                        y: y + (Math.random() - 0.5) * 20,
+                        r: 2 + Math.random() * 5,
+                        vy: -0.6 - Math.random() * 1.2,
+                        vx: (Math.random() - 0.5) * 0.4,
+                        life: 1,
+                        decay: 0.004 + Math.random() * 0.008,
+                    });
+                }
+            }
+
+            function spawnParticles(x, y, color, count) {
+                count = count || 12;
+                for (let i = 0; i < count; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const s = Math.random() * 5 + 2;
+                    particles.push({
+                        x,
+                        y,
+                        vx: Math.cos(a) * s,
+                        vy: Math.sin(a) * s - Math.random() * 3,
+                        life: 1,
+                        decay: 0.02 + Math.random() * 0.05,
+                        color,
+                        r: Math.random() * 3 + 1.5,
+                    });
+                }
+            }
+
+            function addPopup(x, y, text, color) {
+                popups.push({ x, y, text, color, life: 1, decay: 0.018, vy: -3 });
+            }
+
+            function initSeaweeds() {
+                seaweeds = [];
+                const count = Math.floor(W / 80) + 4;
+                for (let i = 0; i < count; i++) {
+                    seaweeds.push({
+                        x: (i / count) * W + Math.random() * 30,
+                        h: H * 0.08 + Math.random() * H * 0.12,
+                        w: 6 + Math.random() * 8,
+                        phase: Math.random() * Math.PI * 2,
+                        swaySpeed: 0.012 + Math.random() * 0.02,
+                        segments: 5 + Math.floor(Math.random() * 7),
+                    });
+                }
+            }
+
+            function resetGame() {
+                score = 0;
+                frame = 0;
+                fishes = [];
+                bubbles = [];
+                particles = [];
+                popups = [];
+                resetHook();
+                initFishes();
+                initSeaweeds();
+                updateScoreDisplay();
+                state = 'waiting';
+                hintText.textContent = '点击屏幕放下鱼钩 🎣';
+            }
+
+            function updateScoreDisplay() {
+                scoreDisplay.textContent = Math.floor(score);
+                if (score > highScore) {
+                    highScore = Math.floor(score);
+                    try { localStorage.setItem('deepFishHS', highScore); } catch (e) {}
+                }
+                highScoreDisplay.textContent = highScore;
+            }
+
+            function update() {
+                frame++;
+                if (hookCooldown > 0) hookCooldown--;
+                updateHookPosition();
+
+                if (state === 'playing') {
+                    if (fishes.length < 8 && Math.random() < 0.012) spawnFish();
+                    for (let f of fishes) {
+                        f.x += f.speed * f.dir;
+                        f.tailPhase += 0.15;
+                        const margin = f.w + 30;
+                        if (f.dir > 0 && f.x > W + margin) f.alive = false;
+                        if (f.dir < 0 && f.x < -margin) f.alive = false;
+                    }
+                    fishes = fishes.filter(f => f.alive);
+
+                    if (hookExtending && !caughtFish) {
+                        for (let f of fishes) {
+                            const dx = hookX - f.x;
+                            const dy = hookY - f.y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            const catchDist = f.w * 0.55 + 12;
+                            if (dist < catchDist) {
+                                caughtFish = f;
+                                hookExtending = false;
+                                hookRetracting = true;
+                                score += f.score;
+                                if (f.rare) {
+                                    sfxRare();
+                                    spawnParticles(f.x, f.y, '#ffd740', 30);
+                                    addPopup(f.x, f.y, '+' + f.score + ' 稀有!', '#ffd740');
+                                } else if (f.score >= 35) {
+                                    sfxBigCatch();
+                                    spawnParticles(f.x, f.y, f.color, 22);
+                                    addPopup(f.x, f.y, '+' + f.score, f.color);
+                                } else {
+                                    sfxCatch();
+                                    spawnParticles(f.x, f.y, f.color, 14);
+                                    addPopup(f.x, f.y, '+' + f.score, f.color);
+                                }
+                                f.alive = false;
+                                updateScoreDisplay();
+                                break;
+                            }
+                        }
+                    }
+
+                    if (hookRetracting && caughtFish && hookY <= getHookStartY()) {
+                        caughtFish = null;
+                    }
+                }
+
+                for (let b of bubbles) {
+                    b.x += b.vx;
+                    b.y += b.vy;
+                    b.life -= b.decay;
+                }
+                bubbles = bubbles.filter(b => b.life > 0);
+                if (bubbles.length < 25 && Math.random() < 0.3) {
+                    spawnBubbles(Math.random() * W, H + 10, 1);
+                }
+
+                for (let p of particles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life -= p.decay;
+                    p.vy += 0.03;
+                }
+                particles = particles.filter(p => p.life > 0);
+
+                for (let pp of popups) {
+                    pp.y += pp.vy;
+                    pp.life -= pp.decay;
+                }
+                popups = popups.filter(pp => pp.life > 0);
+            }
+
+            function drawFish(f) {
+                ctx.save();
+                ctx.translate(f.x, f.y);
+                const scaleX = f.dir > 0 ? 1 : -1;
+                ctx.scale(scaleX, 1);
+                const hw = f.w / 2;
+                const hh = f.h / 2;
+
+                // 身体
+                const bodyGrad = ctx.createLinearGradient(-hw, 0, hw, 0);
+                bodyGrad.addColorStop(0, f.color);
+                bodyGrad.addColorStop(0.5, '#ffffff');
+                bodyGrad.addColorStop(1, f.color);
+                ctx.fillStyle = bodyGrad;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                // 尾巴
+                const tailW = hw * 0.7;
+                const tailH = hh * 0.8;
+                const tailX = -hw + 4;
+                const tailWave = Math.sin(f.tailPhase) * tailH * 0.5;
+                ctx.fillStyle = f.color;
+                ctx.beginPath();
+                ctx.moveTo(tailX, 0);
+                ctx.lineTo(tailX - tailW, -tailH + tailWave);
+                ctx.lineTo(tailX - tailW * 0.7, 0);
+                ctx.lineTo(tailX - tailW, tailH + tailWave);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // 眼睛
+                const eyeX = hw * 0.5;
+                const eyeY = -hh * 0.2;
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(eyeX, eyeY, hh * 0.35, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#111';
+                ctx.beginPath();
+                ctx.arc(eyeX + hh * 0.1, eyeY, hh * 0.18, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 光泽
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.beginPath();
+                ctx.arc(-hw * 0.25, -hh * 0.3, hh * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+
+                // 海洋背景
+                const oceanGrad = ctx.createLinearGradient(0, 0, 0, H);
+                oceanGrad.addColorStop(0, '#0a3d6b');
+                oceanGrad.addColorStop(0.3, '#0b2d52');
+                oceanGrad.addColorStop(0.6, '#071e38');
+                oceanGrad.addColorStop(1, '#020d1a');
+                ctx.fillStyle = oceanGrad;
+                ctx.fillRect(0, 0, W, H);
+
+                // 水面光线
+                for (let i = 0; i < 8; i++) {
+                    const lx = (i * W / 7 + Math.sin(frame * 0.02 + i) * 30);
+                    const alpha = 0.04 + Math.sin(frame * 0.03 + i * 1.5) * 0.03;
+                    ctx.fillStyle = 'rgba(180,220,255,' + alpha + ')';
+                    ctx.beginPath();
+                    ctx.moveTo(lx - 25, 0);
+                    ctx.lineTo(lx + 15, H * 0.5);
+                    ctx.lineTo(lx + 50, H * 0.5);
+                    ctx.lineTo(lx + 10, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                // 海底沙地
+                const sandY = H * 0.9;
+                const sandGrad = ctx.createLinearGradient(0, sandY, 0, H);
+                sandGrad.addColorStop(0, '#2a1f10');
+                sandGrad.addColorStop(0.3, '#1e150a');
+                sandGrad.addColorStop(1, '#0d0804');
+                ctx.fillStyle = sandGrad;
+                ctx.fillRect(0, sandY, W, H - sandY);
+                ctx.fillStyle = 'rgba(180,160,130,0.15)';
+                for (let i = 0; i < W; i += 15) {
+                    const sy = sandY + Math.sin(i * 0.04 + frame * 0.01) * 6;
+                    ctx.fillRect(i, sy, 12, 3);
+                }
+
+                // 水草
+                for (let sw of seaweeds) {
+                    ctx.strokeStyle = 'rgba(40,130,70,0.7)';
+                    ctx.lineWidth = sw.w;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    const baseX = sw.x;
+                    const baseY = sandY;
+                    ctx.moveTo(baseX, baseY);
+                    for (let s = 1; s <= sw.segments; s++) {
+                        const sx = baseX + Math.sin(frame * sw.swaySpeed + s * 0.8 + sw.phase) * (s * 4);
+                        const sy = baseY - (s / sw.segments) * sw.h;
+                        ctx.lineTo(sx, sy);
+                    }
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(30,100,50,0.4)';
+                    ctx.beginPath();
+                    const tipX = baseX + Math.sin(frame * sw.swaySpeed + sw.segments * 0.8 + sw.phase) * (sw.segments *
+                        4);
+                    const tipY = baseY - sw.h;
+                    ctx.arc(tipX, tipY, sw.w * 1.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // 气泡
+                for (let b of bubbles) {
+                    ctx.fillStyle = 'rgba(200,230,255,' + (b.life * 0.6) + ')';
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,' + (b.life * 0.5) + ')';
+                    ctx.beginPath();
+                    ctx.arc(b.x - b.r * 0.25, b.y - b.r * 0.3, b.r * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // 鱼
+                for (let f of fishes) {
+                    if (f === caughtFish && hookRetracting) continue;
+                    drawFish(f);
+                }
+
+                // 鱼线
+                const pivotX = getHookPivotX();
+                const pivotY = getHookPivotY();
+                ctx.strokeStyle = 'rgba(200,210,220,0.7)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([6, 4]);
+                ctx.lineDashOffset = -frame * 0.5;
+                ctx.beginPath();
+                ctx.moveTo(pivotX, pivotY);
+                ctx.lineTo(hookX, hookY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 鱼钩
+                const hookSize = 10;
+                ctx.fillStyle = '#c0c8d0';
+                ctx.beginPath();
+                ctx.arc(hookX, hookY, hookSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#888';
+                ctx.beginPath();
+                ctx.arc(hookX, hookY, hookSize * 0.45, 0, Math.PI * 2);
+                ctx.fill();
+                // 钩尖
+                ctx.strokeStyle = '#a0a8b0';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(hookX + hookSize * 0.6, hookY + hookSize * 0.6);
+                ctx.lineTo(hookX + hookSize * 1.5, hookY + hookSize * 1.3);
+                ctx.stroke();
+                ctx.fillStyle = '#ddd';
+                ctx.beginPath();
+                ctx.arc(hookX + hookSize * 1.5, hookY + hookSize * 1.3, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 被抓住的鱼
+                if (caughtFish && hookRetracting) {
+                    drawFish(caughtFish);
+                }
+
+                // 粒子
+                for (let p of particles) {
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+
+                // 弹出文字
+                for (let pp of popups) {
+                    const alpha = pp.life;
+                    ctx.fillStyle = pp.color;
+                    ctx.globalAlpha = alpha;
+                    ctx.font = 'bold ' + Math.max(14, Math.floor(W * 0.04)) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(pp.text, pp.x, pp.y);
+                }
+                ctx.globalAlpha = 1;
+
+                // 等待状态
+                if (state === 'waiting') {
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(0, 0, W, H);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold ' + Math.floor(W * 0.06) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🎣 深海垂钓', W / 2, H / 2 - 15);
+                    ctx.fillStyle = 'rgba(200,220,255,0.7)';
+                    ctx.font = Math.floor(W * 0.035) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.fillText('点击屏幕放下鱼钩', W / 2, H / 2 + 30);
+                    ctx.fillText('抓住游过的鱼获取分数', W / 2, H / 2 + 55);
+                }
+            }
+
+            function gameLoop() {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+            canvas.addEventListener('pointerdown', function(e) {
+                e.preventDefault();
+                initAudio();
+                castHook();
+            });
+            canvas.addEventListener('pointerup', function(e) {
+                e.preventDefault();
+            });
+            window.addEventListener('keydown', function(e) {
+                if (e.code === 'Space' || e.code === 'ArrowDown' || e.code === 'KeyJ') {
+                    e.preventDefault();
+                    initAudio();
+                    castHook();
+                }
+                if (e.code === 'KeyF') { e.preventDefault();
+                    toggleFullscreen(); }
+                if (e.code === 'KeyM') { e.preventDefault();
+                    btnSound.click(); }
+            });
+
+            function isFullscreen() {
+                return !!(document.fullscreenElement || document.webkitFullscreenElement);
+            }
+            function requestFullscreen() {
+                const el = document.documentElement;
+                if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            }
+            function exitFullscreen() {
+                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+            function toggleFullscreen() {
+                initAudio();
+                if (isFullscreen()) exitFullscreen();
+                else requestFullscreen();
+            }
+            function updateFullscreenIconUI() {
+                const full = isFullscreen();
+                if (full) {
+                    fullscreenIcon.innerHTML =
+                        '<polyline points="4 8 8 4 4 4 4 8"></polyline><polyline points="20 8 16 4 20 4 20 8"></polyline><polyline points="20 16 16 20 20 20 20 16"></polyline><polyline points="4 16 8 20 4 20 4 16"></polyline>';
+                } else {
+                    fullscreenIcon.innerHTML =
+                        '<polyline points="8 3 3 3 3 8"></polyline><polyline points="16 3 21 3 21 8"></polyline><polyline points="21 16 21 21 16 21"></polyline><polyline points="3 16 3 21 8 21"></polyline>';
+                }
+            }
+            btnFullscreen.addEventListener('pointerdown', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                toggleFullscreen();
+            });
+            document.addEventListener('fullscreenchange', function() {
+                updateFullscreenIconUI();
+                setTimeout(resize, 300);
+            });
+            document.addEventListener('webkitfullscreenchange', function() {
+                updateFullscreenIconUI();
+                setTimeout(resize, 300);
+            });
+            updateFullscreenIconUI();
+
+            btnSound.addEventListener('pointerdown', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                initAudio();
+                soundEnabled = !soundEnabled;
+                updateSoundIcon();
+                if (soundEnabled && audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+            });
+
+            function init() {
+                resize();
+                try { const s = localStorage.getItem('deepFishHS'); if (s) highScore = parseInt(s) || 0; } catch (
+                e) { highScore = 0; }
+                resetGame();
+                updateScoreDisplay();
+                updateSoundIcon();
+                updateFullscreenIconUI();
+            }
+            init();
+            gameLoop();
+        })();
+    </script>
+</body>
+</html>

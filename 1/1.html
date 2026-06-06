@@ -1,1 +1,1324 @@
-1
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌌 星云漂移 · NEBULA DRIFT</title>
+    <style>
+        :root {
+            --bg: #03050f;
+            --surface: rgba(10, 12, 30, 0.75);
+            --cyan: #00d4ff;
+            --gold: #ffb347;
+            --magenta: #ff2d78;
+            --violet: #9b5de5;
+            --text: #e0e6f0;
+            --text-dim: #8899bb;
+            --glow-cyan: 0 0 30px rgba(0, 212, 255, 0.5);
+            --glow-gold: 0 0 30px rgba(255, 179, 71, 0.5);
+            --glow-magenta: 0 0 30px rgba(255, 45, 120, 0.5);
+            --glow-violet: 0 0 30px rgba(155, 93, 229, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            background: var(--bg);
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            cursor: crosshair;
+            position: relative;
+        }
+
+        /* 全屏画布 */
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: block;
+        }
+
+        /* UI 覆盖层 */
+        .ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .ui-layer>* {
+            pointer-events: auto;
+        }
+
+        /* 顶部信息栏 */
+        .info-bar {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 28px;
+            align-items: center;
+            padding: 14px 28px;
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            z-index: 20;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .info-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            min-width: 40px;
+            text-align: center;
+        }
+        .info-value.score {
+            color: var(--gold);
+            text-shadow: var(--glow-gold);
+        }
+        .info-value.lives {
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan);
+            letter-spacing: 4px;
+        }
+        .info-value.combo {
+            color: var(--violet);
+            text-shadow: var(--glow-violet);
+        }
+        .info-divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 1px;
+        }
+
+        /* 全屏按钮 - 大圆形艺术按钮 */
+        .art-btn {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            z-index: 30;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .art-btn::before {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            border: 1.5px solid transparent;
+            transition: all 0.5s ease;
+            pointer-events: none;
+        }
+        .art-btn:hover::before {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.35), 0 0 80px rgba(0, 212, 255, 0.15);
+            animation: pulse-ring 1.5s ease-in-out infinite;
+        }
+        .art-btn:active {
+            transform: scale(0.9);
+            transition: transform 0.12s ease;
+        }
+        @keyframes pulse-ring {
+            0%,
+            100% {
+                box-shadow: 0 0 40px rgba(0, 212, 255, 0.35), 0 0 80px rgba(0, 212, 255, 0.15);
+            }
+            50% {
+                box-shadow: 0 0 60px rgba(0, 212, 255, 0.6), 0 0 120px rgba(0, 212, 255, 0.3);
+            }
+        }
+
+        /* 右上角按钮组 */
+        .corner-btns {
+            position: absolute;
+            top: 28px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            z-index: 30;
+        }
+        .art-btn.small {
+            width: 52px;
+            height: 52px;
+            font-size: 1.2rem;
+            border-radius: 50%;
+            position: static;
+        }
+        .art-btn.small .icon-svg {
+            width: 22px;
+            height: 22px;
+            fill: none;
+            stroke: #fff;
+            stroke-width: 2;
+        }
+
+        /* 中央大按钮 */
+        .art-btn.large {
+            width: 160px;
+            height: 160px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #fff;
+            text-align: center;
+            flex-direction: column;
+            gap: 6px;
+            border-color: rgba(255, 255, 255, 0.4);
+            animation: float-btn 3.5s ease-in-out infinite;
+        }
+        @keyframes float-btn {
+            0%,
+            100% {
+                transform: translate(-50%, -50%) translateY(0);
+            }
+            30% {
+                transform: translate(-50%, -50%) translateY(-12px);
+            }
+            60% {
+                transform: translate(-50%, -50%) translateY(-4px);
+            }
+        }
+        .art-btn.large .btn-icon {
+            font-size: 2.4rem;
+            animation: spin-slow 8s linear infinite;
+        }
+        @keyframes spin-slow {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .art-btn.large .btn-label {
+            font-size: 0.85rem;
+            letter-spacing: 3px;
+            opacity: 0.85;
+        }
+
+        /* 底部按钮 */
+        .art-btn.medium {
+            width: 110px;
+            height: 110px;
+            left: 50%;
+            bottom: 40px;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            color: #fff;
+            flex-direction: column;
+            gap: 4px;
+            border-color: rgba(255, 255, 255, 0.25);
+            display: none;
+        }
+        .art-btn.medium.visible {
+            display: flex;
+        }
+        .art-btn.medium .btn-icon {
+            font-size: 1.8rem;
+        }
+
+        /* 提示文字 */
+        .hint-text {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            text-align: center;
+            z-index: 25;
+            transition: opacity 0.6s;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .info-bar {
+                gap: 14px;
+                padding: 10px 18px;
+                border-radius: 30px;
+                top: 16px;
+            }
+            .info-item {
+                font-size: 0.7rem;
+                gap: 5px;
+                letter-spacing: 1px;
+            }
+            .info-value {
+                font-size: 1rem;
+                min-width: 28px;
+            }
+            .art-btn.large {
+                width: 120px;
+                height: 120px;
+                font-size: 0.8rem;
+                gap: 2px;
+            }
+            .art-btn.large .btn-icon {
+                font-size: 1.8rem;
+            }
+            .art-btn.large .btn-label {
+                font-size: 0.7rem;
+                letter-spacing: 1.5px;
+            }
+            .art-btn.small {
+                width: 42px;
+                height: 42px;
+                font-size: 1rem;
+            }
+            .art-btn.medium {
+                width: 90px;
+                height: 90px;
+                bottom: 30px;
+                font-size: 0.7rem;
+            }
+            .corner-btns {
+                top: 18px;
+                right: 12px;
+                gap: 10px;
+            }
+            .hint-text {
+                bottom: 16px;
+                font-size: 0.65rem;
+                letter-spacing: 1px;
+            }
+        }
+        @media (max-width: 400px) {
+            .info-bar {
+                gap: 8px;
+                padding: 8px 14px;
+                border-radius: 24px;
+                top: 10px;
+            }
+            .info-item {
+                font-size: 0.6rem;
+                gap: 3px;
+            }
+            .info-value {
+                font-size: 0.85rem;
+                min-width: 22px;
+            }
+            .info-divider {
+                height: 14px;
+            }
+            .art-btn.large {
+                width: 100px;
+                height: 100px;
+            }
+            .art-btn.large .btn-icon {
+                font-size: 1.4rem;
+            }
+            .art-btn.large .btn-label {
+                font-size: 0.6rem;
+                letter-spacing: 1px;
+            }
+            .art-btn.small {
+                width: 36px;
+                height: 36px;
+            }
+            .corner-btns {
+                top: 12px;
+                right: 8px;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 游戏画布 -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI 覆盖层 -->
+    <div class="ui-layer">
+        <!-- 顶部信息栏 -->
+        <div class="info-bar" id="infoBar">
+            <div class="info-item">
+                <span>✦ 得分</span>
+                <span class="info-value score" id="scoreDisplay">0</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-item">
+                <span>生命</span>
+                <span class="info-value lives" id="livesDisplay">●●●</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-item">
+                <span>连击</span>
+                <span class="info-value combo" id="comboDisplay">×1</span>
+            </div>
+        </div>
+
+        <!-- 右上角按钮组 -->
+        <div class="corner-btns">
+            <!-- 全屏按钮 -->
+            <button class="art-btn small" id="btnFullscreen" title="全屏模式" aria-label="全屏切换">
+                <svg class="icon-svg" viewBox="0 0 24 24">
+                    <polyline points="8 3 3 3 3 8"></polyline>
+                    <polyline points="16 3 21 3 21 8"></polyline>
+                    <polyline points="21 16 21 21 16 21"></polyline>
+                    <polyline points="3 16 3 21 8 21"></polyline>
+                </svg>
+            </button>
+            <!-- 音效按钮 -->
+            <button class="art-btn small" id="btnSound" title="音效开关" aria-label="音效切换">
+                <span style="font-size:1.3rem;" id="soundIcon">🔊</span>
+            </button>
+        </div>
+
+        <!-- 中央开始按钮 -->
+        <button class="art-btn large" id="btnStart" title="开始游戏">
+            <span class="btn-icon">◈</span>
+            <span class="btn-label">开 始</span>
+        </button>
+
+        <!-- 底部重新开始按钮（游戏结束显示） -->
+        <button class="art-btn medium" id="btnRestart" title="重新开始">
+            <span class="btn-icon">↻</span>
+            <span>重来</span>
+        </button>
+
+        <!-- 底部提示 -->
+        <div class="hint-text" id="hintText">移动鼠标 · 收集光点 · 避开暗影</div>
+    </div>
+
+    <script>
+        (function() {
+            // ==================== DOM 元素 ====================
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const livesDisplay = document.getElementById('livesDisplay');
+            const comboDisplay = document.getElementById('comboDisplay');
+            const btnStart = document.getElementById('btnStart');
+            const btnRestart = document.getElementById('btnRestart');
+            const btnFullscreen = document.getElementById('btnFullscreen');
+            const btnSound = document.getElementById('btnSound');
+            const soundIcon = document.getElementById('soundIcon');
+            const hintText = document.getElementById('hintText');
+            const infoBar = document.getElementById('infoBar');
+
+            // ==================== 画布尺寸 ====================
+            let W, H;
+
+            function resizeCanvas() {
+                W = window.innerWidth;
+                H = window.innerHeight;
+                canvas.width = W;
+                canvas.height = H;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                // 调整玩家位置保持在屏幕内
+                if (player.x > W) player.x = W - 40;
+                if (player.y > H) player.y = H - 40;
+            });
+
+            // ==================== 音效引擎 ====================
+            let audioCtx = null;
+            let soundEnabled = true;
+
+            function initAudio() {
+                if (!audioCtx) {
+                    try {
+                        audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                    } catch (e) {
+                        soundEnabled = false;
+                        updateSoundIcon();
+                        return;
+                    }
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            }
+
+            function playSound(freq, type, duration, vol = 0.06, glideTo = null, glideStart = null) {
+                if (!soundEnabled || !audioCtx) return;
+                try {
+                    const t = audioCtx.currentTime;
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = type;
+                    const startFreq = glideStart || freq;
+                    osc.frequency.setValueAtTime(startFreq, t);
+                    if (glideTo) osc.frequency.linearRampToValueAtTime(glideTo, t + duration);
+                    else if (glideStart) osc.frequency.linearRampToValueAtTime(freq, t + duration * 0.3);
+                    gain.gain.setValueAtTime(vol, t);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(t);
+                    osc.stop(t + duration);
+                } catch (e) { /* 静默 */ }
+            }
+
+            function sfxCollect() { playSound(800, 'sine', 0.1, 0.07);
+                playSound(1200, 'sine', 0.05, 0.1, 1600); }
+
+            function sfxCombo() { playSound(600, 'sine', 0.04, 0.06);
+                playSound(900, 'triangle', 0.03, 0.08, 1100);
+                playSound(1400, 'sine', 0.02, 0.1); }
+
+            function sfxHit() { playSound(50, 'sawtooth', 0.2, 0.35, 25);
+                playSound(80, 'square', 0.08, 0.2); }
+
+            function sfxGameOver() { playSound(30, 'sawtooth', 0.25, 0.7, 15); }
+
+            function sfxPowerUp() { playSound(500, 'sine', 0.05, 0.08, 1000);
+                playSound(700, 'triangle', 0.04, 0.12, 1400); }
+
+            function updateSoundIcon() {
+                soundIcon.textContent = soundEnabled ? '🔊' : '🔇';
+            }
+
+            // ==================== 游戏状态 ====================
+            let gameState = 'waiting'; // waiting | playing | paused | gameover
+            let score = 0;
+            let lives = 3;
+            let comboCount = 0;
+            let comboTimer = 0;
+            const COMBO_TIMEOUT = 90; // 帧数
+            let invincibleTimer = 0;
+            const INVINCIBLE_DURATION = 180; // 3秒
+            let shakeAmount = 0;
+            let difficultyLevel = 1;
+
+            // ==================== 玩家 ====================
+            const player = {
+                x: 0,
+                y: 0,
+                r: 18,
+                targetX: 0,
+                targetY: 0,
+                trail: [],
+                maxTrail: 22,
+                glowPhase: 0,
+            };
+
+            // ==================== 游戏对象 ====================
+            let energyParticles = [];
+            let obstacles = [];
+            let powerUps = [];
+            let bgParticles = [];
+            let explosionParticles = [];
+            let gridLines = [];
+
+            // 初始化玩家位置
+            function initPlayerPosition() {
+                player.x = W / 2;
+                player.y = H / 2;
+                player.targetX = player.x;
+                player.targetY = player.y;
+                player.trail = [];
+            }
+
+            // ==================== 背景粒子 ====================
+            function initBgParticles() {
+                bgParticles = [];
+                const count = Math.floor((W * H) / 8000);
+                for (let i = 0; i < Math.min(count, 250); i++) {
+                    bgParticles.push({
+                        x: Math.random() * W,
+                        y: Math.random() * H,
+                        r: Math.random() * 1.8 + 0.3,
+                        vx: (Math.random() - 0.5) * 0.3,
+                        vy: (Math.random() - 0.5) * 0.3,
+                        alpha: Math.random() * 0.6 + 0.2,
+                        twinkleSpeed: Math.random() * 0.02 + 0.005,
+                        twinkleOffset: Math.random() * Math.PI * 2,
+                    });
+                }
+            }
+
+            // ==================== 网格线 ====================
+            function initGridLines() {
+                gridLines = [];
+                const spacing = 60;
+                for (let x = spacing; x < W; x += spacing) {
+                    gridLines.push({ x1: x, y1: 0, x2: x, y2: H, alpha: 0.03 });
+                }
+                for (let y = spacing; y < H; y += spacing) {
+                    gridLines.push({ x1: 0, y1: y, x2: W, y2: y, alpha: 0.03 });
+                }
+            }
+
+            // ==================== 生成能量粒子 ====================
+            function spawnEnergyParticle() {
+                const margin = 50;
+                const x = margin + Math.random() * (W - margin * 2);
+                const y = margin + Math.random() * (H - margin * 2);
+                // 确保不在玩家附近生成
+                const dx = x - player.x;
+                const dy = y - player.y;
+                if (Math.sqrt(dx * dx + dy * dy) < 120) return;
+                energyParticles.push({
+                    x,
+                    y,
+                    r: 6 + Math.random() * 5,
+                    life: 300 + Math.random() * 300,
+                    maxLife: 600,
+                    pulse: Math.random() * Math.PI * 2,
+                    pulseSpeed: 0.03 + Math.random() * 0.05,
+                    alpha: 1,
+                });
+            }
+
+            // ==================== 生成障碍物 ====================
+            function spawnObstacle() {
+                const margin = 60;
+                let x, y;
+                const side = Math.floor(Math.random() * 4);
+                switch (side) {
+                    case 0:
+                        x = margin + Math.random() * (W - margin * 2);
+                        y = -30;
+                        break;
+                    case 1:
+                        x = W + 30;
+                        y = margin + Math.random() * (H - margin * 2);
+                        break;
+                    case 2:
+                        x = margin + Math.random() * (W - margin * 2);
+                        y = H + 30;
+                        break;
+                    case 3:
+                        x = -30;
+                        y = margin + Math.random() * (H - margin * 2);
+                        break;
+                }
+                const speed = 1.2 + Math.random() * 1.8 + difficultyLevel * 0.3;
+                const angle = Math.atan2(player.y - y, player.x - x) + (Math.random() - 0.5) * 1.2;
+                obstacles.push({
+                    x,
+                    y,
+                    r: 14 + Math.random() * 18,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    alpha: 0.85,
+                    pulsePhase: Math.random() * Math.PI * 2,
+                    life: 500 + Math.random() * 400,
+                });
+            }
+
+            // ==================== 生成道具 ====================
+            function spawnPowerUp() {
+                const margin = 80;
+                const x = margin + Math.random() * (W - margin * 2);
+                const y = margin + Math.random() * (H - margin * 2);
+                powerUps.push({
+                    x,
+                    y,
+                    r: 13,
+                    life: 350 + Math.random() * 250,
+                    maxLife: 600,
+                    type: 'invincible',
+                    pulse: 0,
+                    alpha: 1,
+                });
+            }
+
+            // ==================== 爆炸粒子 ====================
+            function spawnExplosion(x, y, color, count = 20) {
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 6 + 2;
+                    explosionParticles.push({
+                        x,
+                        y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 1,
+                        decay: 0.015 + Math.random() * 0.04,
+                        color,
+                        r: Math.random() * 3 + 1.5,
+                    });
+                }
+            }
+
+            // ==================== 重置游戏 ====================
+            function resetGame() {
+                score = 0;
+                lives = 3;
+                comboCount = 0;
+                comboTimer = 0;
+                invincibleTimer = 0;
+                shakeAmount = 0;
+                difficultyLevel = 1;
+                energyParticles = [];
+                obstacles = [];
+                powerUps = [];
+                explosionParticles = [];
+                initPlayerPosition();
+                initBgParticles();
+                initGridLines();
+                updateDisplays();
+                // 初始生成一些能量粒子
+                for (let i = 0; i < 12; i++) spawnEnergyParticle();
+                for (let i = 0; i < 4; i++) spawnObstacle();
+            }
+
+            function updateDisplays() {
+                scoreDisplay.textContent = score;
+                const hearts = ['●', '●', '●'];
+                let lstr = '';
+                for (let i = 0; i < 3; i++) lstr += i < lives ? '●' : '○';
+                livesDisplay.textContent = lstr;
+                comboDisplay.textContent = '×' + Math.max(1, comboCount);
+                if (comboCount >= 8) comboDisplay.style.color = '#ffb347';
+                else if (comboCount >= 4) comboDisplay.style.color = '#ff6b9d';
+                else comboDisplay.style.color = '#9b5de5';
+            }
+
+            // ==================== UI 更新 ====================
+            function updateUIForState() {
+                switch (gameState) {
+                    case 'waiting':
+                        btnStart.style.display = 'flex';
+                        btnRestart.classList.remove('visible');
+                        hintText.style.opacity = '1';
+                        infoBar.style.opacity = '0.7';
+                        break;
+                    case 'playing':
+                        btnStart.style.display = 'none';
+                        btnRestart.classList.remove('visible');
+                        hintText.style.opacity = '0';
+                        infoBar.style.opacity = '1';
+                        break;
+                    case 'gameover':
+                        btnStart.style.display = 'none';
+                        btnRestart.classList.add('visible');
+                        hintText.style.opacity = '0';
+                        infoBar.style.opacity = '1';
+                        break;
+                }
+            }
+
+            // ==================== 游戏循环 ====================
+            let frameCount = 0;
+            let lastSpawnEnergy = 0;
+            let lastSpawnObstacle = 0;
+            let lastSpawnPowerUp = 0;
+
+            function update() {
+                if (gameState !== 'playing') return;
+                frameCount++;
+
+                // 难度递增
+                difficultyLevel = 1 + Math.floor(score / 300);
+                const maxObstacles = 6 + difficultyLevel * 2;
+                const energyTarget = 10 + difficultyLevel;
+
+                // 玩家平滑移动
+                const lerpFactor = 0.18;
+                player.x += (player.targetX - player.x) * lerpFactor;
+                player.y += (player.targetY - player.y) * lerpFactor;
+
+                // 边界限制
+                player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+                player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+
+                // 拖尾
+                player.trail.push({ x: player.x, y: player.y, life: 1, r: player.r });
+                if (player.trail.length > player.maxTrail) player.trail.shift();
+                for (let t of player.trail) t.life -= 0.04;
+                player.trail = player.trail.filter(t => t.life > 0);
+                player.glowPhase += 0.05;
+
+                // 无敌计时器
+                if (invincibleTimer > 0) invincibleTimer--;
+
+                // 震屏衰减
+                if (shakeAmount > 0) shakeAmount *= 0.88;
+                if (shakeAmount < 0.05) shakeAmount = 0;
+
+                // 连击计时器
+                if (comboTimer > 0) {
+                    comboTimer--;
+                    if (comboTimer <= 0) {
+                        comboCount = 0;
+                        updateDisplays();
+                    }
+                }
+
+                // 生成能量粒子
+                if (energyParticles.length < energyTarget && frameCount - lastSpawnEnergy > 25) {
+                    spawnEnergyParticle();
+                    lastSpawnEnergy = frameCount;
+                }
+
+                // 生成障碍物
+                if (obstacles.length < maxObstacles && frameCount - lastSpawnObstacle > 70 - difficultyLevel * 3) {
+                    spawnObstacle();
+                    lastSpawnObstacle = frameCount;
+                }
+
+                // 生成道具
+                if (powerUps.length < 2 && frameCount - lastSpawnPowerUp > 500 + Math.random() * 300) {
+                    spawnPowerUp();
+                    lastSpawnPowerUp = frameCount;
+                }
+
+                // 更新能量粒子
+                for (let ep of energyParticles) {
+                    ep.life--;
+                    ep.pulse += ep.pulseSpeed;
+                    ep.alpha = Math.min(1, ep.life / 100);
+                }
+                energyParticles = energyParticles.filter(ep => ep.life > 0);
+
+                // 更新障碍物
+                for (let ob of obstacles) {
+                    ob.x += ob.vx;
+                    ob.y += ob.vy;
+                    ob.life--;
+                    ob.pulsePhase += 0.04;
+                    // 边界反弹
+                    if (ob.x < -40 || ob.x > W + 40 || ob.y < -40 || ob.y > H + 40) {
+                        ob.life = 0;
+                    }
+                }
+                obstacles = obstacles.filter(ob => ob.life > 0);
+
+                // 更新道具
+                for (let pu of powerUps) {
+                    pu.life--;
+                    pu.pulse += 0.06;
+                    pu.alpha = Math.min(1, pu.life / 120);
+                }
+                powerUps = powerUps.filter(pu => pu.life > 0);
+
+                // 碰撞检测：玩家 vs 能量粒子
+                for (let i = energyParticles.length - 1; i >= 0; i--) {
+                    const ep = energyParticles[i];
+                    const dx = player.x - ep.x;
+                    const dy = player.y - ep.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < player.r + ep.r + 6) {
+                        // 收集
+                        const points = 10 + Math.floor(comboCount / 3) * 5;
+                        score += points;
+                        comboCount++;
+                        comboTimer = COMBO_TIMEOUT;
+                        if (comboCount >= 5 && comboCount % 5 === 0) sfxCombo();
+                        else sfxCollect();
+                        spawnExplosion(ep.x, ep.y, '#ffb347', 8);
+                        energyParticles.splice(i, 1);
+                        updateDisplays();
+                    }
+                }
+
+                // 碰撞检测：玩家 vs 障碍物
+                if (invincibleTimer <= 0) {
+                    for (let i = obstacles.length - 1; i >= 0; i--) {
+                        const ob = obstacles[i];
+                        const dx = player.x - ob.x;
+                        const dy = player.y - ob.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < player.r + ob.r - 2) {
+                            // 被击中
+                            sfxHit();
+                            spawnExplosion(player.x, player.y, '#ff2d78', 35);
+                            spawnExplosion(ob.x, ob.y, '#ff2d78', 15);
+                            shakeAmount = 20;
+                            lives--;
+                            comboCount = 0;
+                            comboTimer = 0;
+                            invincibleTimer = 90; // 1.5秒无敌
+                            obstacles.splice(i, 1);
+                            updateDisplays();
+                            if (lives <= 0) {
+                                gameState = 'gameover';
+                                sfxGameOver();
+                                spawnExplosion(player.x, player.y, '#ffffff', 50);
+                                spawnExplosion(player.x, player.y, '#ff2d78', 40);
+                                updateUIForState();
+                                return;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // 碰撞检测：玩家 vs 道具
+                for (let i = powerUps.length - 1; i >= 0; i--) {
+                    const pu = powerUps[i];
+                    const dx = player.x - pu.x;
+                    const dy = player.y - pu.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < player.r + pu.r + 4) {
+                        sfxPowerUp();
+                        invincibleTimer = INVINCIBLE_DURATION;
+                        spawnExplosion(pu.x, pu.y, '#9b5de5', 25);
+                        spawnExplosion(pu.x, pu.y, '#ffffff', 15);
+                        powerUps.splice(i, 1);
+                    }
+                }
+
+                // 更新爆炸粒子
+                for (let ep of explosionParticles) {
+                    ep.x += ep.vx;
+                    ep.y += ep.vy;
+                    ep.life -= ep.decay;
+                    ep.vy += 0.03;
+                }
+                explosionParticles = explosionParticles.filter(ep => ep.life > 0);
+
+                // 更新背景粒子
+                for (let bp of bgParticles) {
+                    bp.x += bp.vx;
+                    bp.y += bp.vy;
+                    if (bp.x < -10) bp.x = W + 10;
+                    if (bp.x > W + 10) bp.x = -10;
+                    if (bp.y < -10) bp.y = H + 10;
+                    if (bp.y > H + 10) bp.y = -10;
+                    bp.alpha = 0.2 + Math.sin(frameCount * bp.twinkleSpeed + bp.twinkleOffset) * 0.25 + 0.25;
+                }
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+
+                // 震屏偏移
+                let sx = 0,
+                    sy = 0;
+                if (shakeAmount > 0.3) {
+                    sx = (Math.random() - 0.5) * shakeAmount;
+                    sy = (Math.random() - 0.5) * shakeAmount;
+                }
+                ctx.save();
+                ctx.translate(sx, sy);
+
+                // 背景渐变
+                const bgGrad = ctx.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.9);
+                bgGrad.addColorStop(0, '#0a0d22');
+                bgGrad.addColorStop(0.5, '#050814');
+                bgGrad.addColorStop(1, '#010308');
+                ctx.fillStyle = bgGrad;
+                ctx.fillRect(-20, -20, W + 40, H + 40);
+
+                // 网格线
+                ctx.strokeStyle = 'rgba(100,140,200,0.04)';
+                ctx.lineWidth = 0.5;
+                const spacing = 60;
+                for (let x = spacing; x < W; x += spacing) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, -20);
+                    ctx.lineTo(x, H + 20);
+                    ctx.stroke();
+                }
+                for (let y = spacing; y < H; y += spacing) {
+                    ctx.beginPath();
+                    ctx.moveTo(-20, y);
+                    ctx.lineTo(W + 20, y);
+                    ctx.stroke();
+                }
+
+                // 背景粒子
+                for (let bp of bgParticles) {
+                    ctx.fillStyle = `rgba(180,210,255,${bp.alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // 道具
+                for (let pu of powerUps) {
+                    const glowR = pu.r + 10 + Math.sin(pu.pulse) * 8;
+                    const glowGrad = ctx.createRadialGradient(pu.x, pu.y, pu.r * 0.5, pu.x, pu.y, glowR);
+                    glowGrad.addColorStop(0, 'rgba(155,93,229,0.9)');
+                    glowGrad.addColorStop(0.4, 'rgba(155,93,229,0.4)');
+                    glowGrad.addColorStop(1, 'rgba(155,93,229,0)');
+                    ctx.fillStyle = glowGrad;
+                    ctx.beginPath();
+                    ctx.arc(pu.x, pu.y, glowR, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 核心
+                    const coreGrad = ctx.createRadialGradient(pu.x, pu.y, 1, pu.x, pu.y, pu.r);
+                    coreGrad.addColorStop(0, '#ffffff');
+                    coreGrad.addColorStop(0.3, '#d4bfff');
+                    coreGrad.addColorStop(1, '#9b5de5');
+                    ctx.fillStyle = coreGrad;
+                    ctx.beginPath();
+                    ctx.arc(pu.x, pu.y, pu.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 旋转光环
+                    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([8, 6]);
+                    ctx.lineDashOffset = -pu.pulse * 20;
+                    ctx.beginPath();
+                    ctx.arc(pu.x, pu.y, pu.r + 5, pu.pulse * 0.7, pu.pulse * 0.7 + Math.PI * 1.6);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // 能量粒子
+                for (let ep of energyParticles) {
+                    const glowR = ep.r + 4 + Math.sin(ep.pulse) * 3;
+                    const glowGrad = ctx.createRadialGradient(ep.x, ep.y, ep.r * 0.3, ep.x, ep.y, glowR);
+                    glowGrad.addColorStop(0, 'rgba(255,200,100,0.95)');
+                    glowGrad.addColorStop(0.5, 'rgba(255,160,60,0.5)');
+                    glowGrad.addColorStop(1, 'rgba(255,120,30,0)');
+                    ctx.fillStyle = glowGrad;
+                    ctx.globalAlpha = ep.alpha;
+                    ctx.beginPath();
+                    ctx.arc(ep.x, ep.y, glowR, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 亮点
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(ep.x, ep.y, ep.r * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+
+                // 障碍物
+                for (let ob of obstacles) {
+                    const warnR = ob.r + 8 + Math.sin(ob.pulsePhase) * 5;
+                    const warnGrad = ctx.createRadialGradient(ob.x, ob.y, ob.r * 0.6, ob.x, ob.y, warnR);
+                    warnGrad.addColorStop(0, 'rgba(255,45,120,0.85)');
+                    warnGrad.addColorStop(0.5, 'rgba(200,20,70,0.35)');
+                    warnGrad.addColorStop(1, 'rgba(150,10,40,0)');
+                    ctx.fillStyle = warnGrad;
+                    ctx.beginPath();
+                    ctx.arc(ob.x, ob.y, warnR, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 主体
+                    const bodyGrad = ctx.createRadialGradient(ob.x - ob.r * 0.3, ob.y - ob.r * 0.3, ob.r * 0.1, ob.x, ob
+                        .y, ob.r);
+                    bodyGrad.addColorStop(0, '#ff6b8a');
+                    bodyGrad.addColorStop(0.6, '#c0103a');
+                    bodyGrad.addColorStop(1, '#3a0010');
+                    ctx.fillStyle = bodyGrad;
+                    ctx.beginPath();
+                    ctx.arc(ob.x, ob.y, ob.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 锯齿边缘
+                    ctx.strokeStyle = 'rgba(255,100,130,0.7)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    const spikes = 8;
+                    for (let s = 0; s < spikes; s++) {
+                        const angle = (s / spikes) * Math.PI * 2 + ob.pulsePhase;
+                        const sr = ob.r + 2 + Math.sin(s * 2.5 + ob.pulsePhase) * 2;
+                        const sx = ob.x + Math.cos(angle) * sr;
+                        const sy = ob.y + Math.sin(angle) * sr;
+                        if (s === 0) ctx.moveTo(sx, sy);
+                        else ctx.lineTo(sx, sy);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+
+                // 玩家拖尾
+                for (let i = 0; i < player.trail.length; i++) {
+                    const t = player.trail[i];
+                    const alpha = t.life * 0.45;
+                    const r = t.r * t.life * 0.8;
+                    ctx.fillStyle = `rgba(0,212,255,${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // 无敌光环
+                if (invincibleTimer > 0 && gameState === 'playing') {
+                    const shieldR = player.r + 14 + Math.sin(frameCount * 0.15) * 4;
+                    const shieldAlpha = 0.5 + Math.sin(frameCount * 0.2) * 0.3;
+                    ctx.strokeStyle = `rgba(155,93,229,${shieldAlpha})`;
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = 'rgba(155,93,229,0.7)';
+                    ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, shieldR, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    // 第二层
+                    ctx.strokeStyle = `rgba(255,255,255,${shieldAlpha * 0.6})`;
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([10, 8]);
+                    ctx.lineDashOffset = frameCount * 2;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, shieldR + 6, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // 玩家主体
+                const playerGlowR = player.r + 16 + Math.sin(player.glowPhase) * 6;
+                const playerGlow = ctx.createRadialGradient(player.x, player.y, player.r * 0.5, player.x, player.y,
+                    playerGlowR);
+                playerGlow.addColorStop(0, 'rgba(200,240,255,0.9)');
+                playerGlow.addColorStop(0.3, 'rgba(0,200,255,0.6)');
+                playerGlow.addColorStop(0.7, 'rgba(0,120,220,0.15)');
+                playerGlow.addColorStop(1, 'rgba(0,60,180,0)');
+                ctx.fillStyle = playerGlow;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, playerGlowR, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 玩家核心
+                const coreGrad = ctx.createRadialGradient(player.x - player.r * 0.2, player.y - player.r * 0.2, player.r *
+                    0.1, player.x, player.y, player.r);
+                coreGrad.addColorStop(0, '#ffffff');
+                coreGrad.addColorStop(0.35, '#d0f0ff');
+                coreGrad.addColorStop(0.7, '#00b8f0');
+                coreGrad.addColorStop(1, '#0050a0');
+                ctx.fillStyle = coreGrad;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 玩家高光点
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(player.x - player.r * 0.25, player.y - player.r * 0.3, player.r * 0.35, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 爆炸粒子
+                for (let ep of explosionParticles) {
+                    const alpha = ep.life;
+                    ctx.fillStyle = ep.color.replace(')', `,${alpha})`).replace('rgb', 'rgba');
+                    if (ep.color.startsWith('#')) {
+                        ctx.globalAlpha = alpha;
+                        ctx.fillStyle = ep.color;
+                    }
+                    ctx.beginPath();
+                    ctx.arc(ep.x, ep.y, ep.r * ep.life, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+
+                ctx.restore();
+
+                // 画面覆盖效果（游戏结束）
+                if (gameState === 'gameover') {
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                    ctx.fillRect(0, 0, W, H);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold clamp(24px,5vw,48px) "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('星 云 消 散', W / 2, H / 2 - 10);
+                    ctx.fillStyle = '#ffb347';
+                    ctx.font = 'clamp(14px,3vw,22px) "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.fillText('最终得分: ' + score, W / 2, H / 2 + 50);
+                }
+            }
+
+            function gameLoop() {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+            // ==================== 输入处理 ====================
+            function updatePlayerTarget(clientX, clientY) {
+                player.targetX = clientX;
+                player.targetY = clientY;
+            }
+
+            // 鼠标
+            window.addEventListener('mousemove', (e) => {
+                updatePlayerTarget(e.clientX, e.clientY);
+                if (gameState === 'waiting') {
+                    player.x += (player.targetX - player.x) * 0.3;
+                    player.y += (player.targetY - player.y) * 0.3;
+                    player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+                    player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+                }
+            });
+
+            // 触摸
+            window.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    updatePlayerTarget(e.touches[0].clientX, e.touches[0].clientY);
+                }
+                if (gameState === 'waiting') {
+                    player.x += (player.targetX - player.x) * 0.3;
+                    player.y += (player.targetY - player.y) * 0.3;
+                }
+            }, { passive: true });
+
+            window.addEventListener('touchstart', (e) => {
+                initAudio();
+                if (e.touches.length > 0) {
+                    updatePlayerTarget(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: true });
+
+            // 点击开始
+            btnStart.addEventListener('click', (e) => {
+                e.stopPropagation();
+                initAudio();
+                startGame();
+            });
+
+            btnRestart.addEventListener('click', (e) => {
+                e.stopPropagation();
+                initAudio();
+                startGame();
+            });
+
+            function startGame() {
+                resetGame();
+                gameState = 'playing';
+                updateUIForState();
+                updateDisplays();
+            }
+
+            // 全屏按钮
+            btnFullscreen.addEventListener('click', (e) => {
+                e.stopPropagation();
+                initAudio();
+                if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                    const el = document.documentElement;
+                    if (el.requestFullscreen) el.requestFullscreen();
+                    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
+                    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                }
+            });
+
+            // 音效按钮
+            btnSound.addEventListener('click', (e) => {
+                e.stopPropagation();
+                initAudio();
+                soundEnabled = !soundEnabled;
+                updateSoundIcon();
+                if (soundEnabled && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            });
+
+            // 键盘控制
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' || e.code === 'Enter') {
+                    e.preventDefault();
+                    initAudio();
+                    if (gameState === 'waiting' || gameState === 'gameover') {
+                        startGame();
+                    }
+                }
+                if (e.code === 'KeyF') {
+                    btnFullscreen.click();
+                }
+                if (e.code === 'KeyM') {
+                    btnSound.click();
+                }
+                // 键盘移动
+                const moveSpeed = 40;
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') player.targetX -= moveSpeed;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') player.targetX += moveSpeed;
+                if (e.code === 'ArrowUp' || e.code === 'KeyW') player.targetY -= moveSpeed;
+                if (e.code === 'ArrowDown' || e.code === 'KeyS') player.targetY += moveSpeed;
+                player.targetX = Math.max(0, Math.min(W, player.targetX));
+                player.targetY = Math.max(0, Math.min(H, player.targetY));
+            });
+
+            // ==================== 初始化 ====================
+            function init() {
+                resizeCanvas();
+                initPlayerPosition();
+                initBgParticles();
+                initGridLines();
+                for (let i = 0; i < 12; i++) spawnEnergyParticle();
+                for (let i = 0; i < 4; i++) spawnObstacle();
+                updateDisplays();
+                updateUIForState();
+                updateSoundIcon();
+                gameState = 'waiting';
+            }
+
+            init();
+            gameLoop();
+
+            // ==================== 窗口大小变化 ====================
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                initBgParticles();
+                initGridLines();
+                player.targetX = Math.min(player.targetX, W - player.r);
+                player.targetY = Math.min(player.targetY, H - player.r);
+            });
+
+            // ==================== 全屏变化监听 ====================
+            document.addEventListener('fullscreenchange', updateFullscreenIcon);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+
+            function updateFullscreenIcon() {
+                const isFull = document.fullscreenElement || document.webkitFullscreenElement;
+                const svg = btnFullscreen.querySelector('svg');
+                if (isFull) {
+                    svg.innerHTML = `
+                        <polyline points="4 8 8 4 4 4 4 8"></polyline>
+                        <polyline points="20 8 16 4 20 4 20 8"></polyline>
+                        <polyline points="20 16 16 20 20 20 20 16"></polyline>
+                        <polyline points="4 16 8 20 4 20 4 16"></polyline>
+                    `;
+                } else {
+                    svg.innerHTML = `
+                        <polyline points="8 3 3 3 3 8"></polyline>
+                        <polyline points="16 3 21 3 21 8"></polyline>
+                        <polyline points="21 16 21 21 16 21"></polyline>
+                        <polyline points="3 16 3 21 8 21"></polyline>
+                    `;
+                }
+            }
+            updateFullscreenIcon();
+
+            console.log('🌌 星云漂移 · NEBULA DRIFT 已就绪');
+            console.log('  🖱️ 鼠标/触摸 → 移动光球');
+            console.log('  ✦ 收集金色光点 → 得分');
+            console.log('  ⚠️ 避开红色暗影 → 保命');
+            console.log('  💎 紫色道具 → 无敌护盾');
+            console.log('  🔥 连续收集 → 连击加分');
+            console.log('  ⌨️ 空格键 → 开始 | F → 全屏 | M → 音效');
+        })();
+    </script>
+</body>
+</html>

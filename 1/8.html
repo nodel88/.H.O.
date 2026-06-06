@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>🫧 泡泡乐园</title>
+    <style>
+        :root {
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0a0a1a;
+            font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            position: fixed;
+            top: 0;
+            left: 0;
+            touch-action: manipulation;
+            -webkit-overflow-scrolling: none;
+        }
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: block;
+            touch-action: manipulation;
+            cursor: pointer;
+        }
+        .ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+            padding-left: var(--safe-left);
+            padding-right: var(--safe-right);
+        }
+        .ui-layer>* {
+            pointer-events: auto;
+        }
+        .top-panel {
+            position: absolute;
+            top: calc(10px + var(--safe-top));
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: rgba(20, 18, 40, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 28px;
+            border: 1px solid rgba(180, 160, 255, 0.25);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+            z-index: 20;
+            white-space: nowrap;
+        }
+        .score-block {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #e0d8ff;
+            letter-spacing: 0.5px;
+        }
+        .score-block .lb {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: #9988cc;
+            letter-spacing: 1.5px;
+        }
+        .score-block .val {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #ffb8d0;
+            text-shadow: 0 0 14px rgba(255, 160, 200, 0.7);
+            min-width: 36px;
+            text-align: center;
+        }
+        .score-block .bst {
+            font-size: 0.7rem;
+            color: #b8e0ff;
+            text-shadow: 0 0 8px rgba(160, 210, 255, 0.5);
+            font-weight: 700;
+        }
+        .score-block .cb {
+            font-size: 0.7rem;
+            color: #ffe0a0;
+            text-shadow: 0 0 8px rgba(255, 210, 140, 0.5);
+            font-weight: 700;
+        }
+        .btn-set {
+            display: flex;
+            gap: 6px;
+            margin-left: 4px;
+        }
+        .circle-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1.5px solid rgba(200, 180, 255, 0.3);
+            background: rgba(30, 22, 55, 0.7);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+            outline: none;
+            color: #fff;
+            font-size: 1rem;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+            z-index: 30;
+        }
+        .circle-btn:active {
+            transform: scale(0.85);
+            border-color: #fff;
+            box-shadow: 0 0 18px rgba(200, 180, 255, 0.5);
+        }
+        .circle-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: #d8d0f8;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
+        }
+        .bottom-tip {
+            position: absolute;
+            bottom: calc(16px + var(--safe-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(200, 190, 230, 0.45);
+            font-size: 0.65rem;
+            letter-spacing: 1.5px;
+            text-align: center;
+            white-space: nowrap;
+            pointer-events: none;
+            transition: opacity 0.4s;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div class="ui-layer">
+        <div class="top-panel">
+            <div class="score-block">
+                <span class="lb">得分</span>
+                <span class="val" id="scoreDisplay">0</span>
+            </div>
+            <div class="score-block">
+                <span class="lb">连击</span>
+                <span class="cb" id="comboDisplay">x1</span>
+            </div>
+            <div class="score-block">
+                <span class="lb">最佳</span>
+                <span class="bst" id="highScoreDisplay">0</span>
+            </div>
+            <div class="btn-set">
+                <button class="circle-btn" id="btnFullscreen" title="全屏" aria-label="全屏切换">
+                    <svg id="fullscreenIcon" viewBox="0 0 24 24">
+                        <polyline points="8 3 3 3 3 8"></polyline>
+                        <polyline points="16 3 21 3 21 8"></polyline>
+                        <polyline points="21 16 21 21 16 21"></polyline>
+                        <polyline points="3 16 3 21 8 21"></polyline>
+                    </svg>
+                </button>
+                <button class="circle-btn" id="btnSound" title="音效">
+                    <span id="soundIcon" style="font-size:0.85rem;">🔊</span>
+                </button>
+            </div>
+        </div>
+        <div class="bottom-tip" id="hintText">点击彩色泡泡 💥 避开红色</div>
+    </div>
+
+    <script>
+        (function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const comboDisplay = document.getElementById('comboDisplay');
+            const highScoreDisplay = document.getElementById('highScoreDisplay');
+            const btnFullscreen = document.getElementById('btnFullscreen');
+            const btnSound = document.getElementById('btnSound');
+            const soundIcon = document.getElementById('soundIcon');
+            const fullscreenIcon = document.getElementById('fullscreenIcon');
+            const hintText = document.getElementById('hintText');
+
+            let W, H;
+            function resize() {
+                W = window.innerWidth;
+                H = window.innerHeight;
+                canvas.width = W;
+                canvas.height = H;
+            }
+            resize();
+            window.addEventListener('resize', resize);
+            window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+
+            let audioCtx = null;
+            let soundEnabled = true;
+            function initAudio() {
+                if (!audioCtx) {
+                    try { audioCtx = new(window.AudioContext || window.webkitAudioContext)(); } catch (e) {
+                        soundEnabled = false;
+                        updateSoundIcon();
+                        return;
+                    }
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+            }
+            function tone(f, t, d, v, g) {
+                if (!soundEnabled || !audioCtx) return;
+                v = v || 0.04;
+                try {
+                    const tm = audioCtx.currentTime;
+                    const o = audioCtx.createOscillator();
+                    const gn = audioCtx.createGain();
+                    o.type = t || 'sine';
+                    o.frequency.setValueAtTime(f, tm);
+                    if (g) o.frequency.linearRampToValueAtTime(g, tm + d);
+                    gn.gain.setValueAtTime(v, tm);
+                    gn.gain.exponentialRampToValueAtTime(0.0001, tm + d);
+                    o.connect(gn);
+                    gn.connect(audioCtx.destination);
+                    o.start(tm);
+                    o.stop(tm + d);
+                } catch (e) {}
+            }
+            function sfxPop() { tone(600, 'sine', 0.06, 0.04, 1000); }
+            function sfxCombo() { tone(500, 'sine', 0.04, 0.04, 900);
+                tone(800, 'triangle', 0.03, 0.05, 1200); }
+            function sfxBad() { tone(60, 'sawtooth', 0.12, 0.22, 30); }
+            function sfxRare() { tone(700, 'sine', 0.04, 0.05, 1100);
+                tone(1000, 'triangle', 0.03, 0.06, 1500);
+                tone(1400, 'sine', 0.02, 0.07); }
+            function sfxGameOver() { tone(25, 'sawtooth', 0.3, 0.6, 10); }
+            function updateSoundIcon() { soundIcon.textContent = soundEnabled ? '🔊' : '🔇'; }
+
+            let state = 'waiting';
+            let score = 0;
+            let highScore = 0;
+            let comboCount = 0;
+            let comboTimer = 0;
+            const COMBO_DECAY = 45;
+            let frame = 0;
+            let bubbles = [];
+            let particles = [];
+            let popups = [];
+            let bgBubbles = [];
+            let missCount = 0;
+            const MAX_MISS = 8;
+            let shakeAmt = 0;
+            let lastBubbleTime = 0;
+            const BUBBLE_COLORS = [
+                { color: '#ff7eb3', glow: '#ffb3d0', score: 10, name: 'pink' },
+                { color: '#7ec8ff', glow: '#b3e0ff', score: 10, name: 'blue' },
+                { color: '#7effa0', glow: '#b3ffcc', score: 10, name: 'green' },
+                { color: '#ffcc5c', glow: '#ffe8a0', score: 10, name: 'yellow' },
+                { color: '#c97eff', glow: '#e0b3ff', score: 10, name: 'purple' },
+                { color: '#ff9a76', glow: '#ffc4b3', score: 10, name: 'orange' },
+            ];
+            const BAD_COLOR = { color: '#ff3040', glow: '#ff8088', score: -20, name: 'red' };
+            const RARE_COLOR = { color: '#ffd740', glow: '#ffeaa0', score: 50, name: 'gold' };
+            const STAR_COLOR = { color: '#ffffff', glow: '#eef0ff', score: 30, name: 'star' };
+
+            function spawnBubble() {
+                const margin = 50;
+                const x = margin + Math.random() * (W - margin * 2);
+                const y = H + 30;
+                const baseR = Math.min(W, H) * 0.04;
+                const r = baseR + Math.random() * baseR * 0.8;
+                const rand = Math.random();
+                let colorData;
+                if (rand < 0.06) colorData = STAR_COLOR;
+                else if (rand < 0.14) colorData = RARE_COLOR;
+                else if (rand < 0.24) colorData = BAD_COLOR;
+                else colorData = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
+                const vy = -(1.2 + Math.random() * 2.2);
+                const vx = (Math.random() - 0.5) * 1.6;
+                bubbles.push({
+                    x,
+                    y,
+                    r,
+                    vy,
+                    vx,
+                    color: colorData.color,
+                    glow: colorData.glow,
+                    score: colorData.score,
+                    name: colorData.name,
+                    alive: true,
+                    wobble: Math.random() * Math.PI * 2,
+                    wobbleSpeed: 0.02 + Math.random() * 0.04,
+                    alpha: 1,
+                });
+                lastBubbleTime = frame;
+            }
+
+            function spawnParticles(x, y, color, count) {
+                count = count || 14;
+                for (let i = 0; i < count; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const s = Math.random() * 6 + 2;
+                    particles.push({
+                        x,
+                        y,
+                        vx: Math.cos(a) * s,
+                        vy: Math.sin(a) * s - Math.random() * 3,
+                        life: 1,
+                        decay: 0.018 + Math.random() * 0.04,
+                        color,
+                        r: Math.random() * 3 + 1.5,
+                    });
+                }
+            }
+
+            function addPopup(x, y, text, color) {
+                popups.push({ x, y, text, color, life: 1, decay: 0.016, vy: -3.5 });
+            }
+
+            function handleBubblePop(bubble) {
+                if (!bubble.alive) return;
+                bubble.alive = false;
+                const bd = bubble;
+                if (bd.name === 'red') {
+                    sfxBad();
+                    score += bd.score;
+                    if (score < 0) score = 0;
+                    comboCount = 0;
+                    comboTimer = 0;
+                    missCount++;
+                    shakeAmt = 10;
+                    spawnParticles(bd.x, bd.y, bd.color, 20);
+                    addPopup(bd.x, bd.y, '' + bd.score, '#ff5060');
+                } else {
+                    comboCount++;
+                    comboTimer = COMBO_DECAY;
+                    const bonusMult = Math.min(comboCount, 15);
+                    const actualScore = bd.score * bonusMult;
+                    score += actualScore;
+                    missCount = Math.max(0, missCount - 1);
+                    if (bd.name === 'gold') {
+                        sfxRare();
+                        spawnParticles(bd.x, bd.y, bd.color, 35);
+                        spawnParticles(bd.x, bd.y, '#ffffff', 20);
+                        addPopup(bd.x, bd.y, '+' + actualScore + ' ✨', '#ffd740');
+                    } else if (bd.name === 'star') {
+                        sfxRare();
+                        spawnParticles(bd.x, bd.y, bd.color, 28);
+                        addPopup(bd.x, bd.y, '+' + actualScore + ' ⭐', '#ffffff');
+                    } else if (comboCount >= 5) {
+                        sfxCombo();
+                        spawnParticles(bd.x, bd.y, bd.color, 20);
+                        addPopup(bd.x, bd.y, '+' + actualScore + ' x' + bonusMult, bd.color);
+                    } else {
+                        sfxPop();
+                        spawnParticles(bd.x, bd.y, bd.color, 10);
+                        addPopup(bd.x, bd.y, '+' + actualScore, bd.color);
+                    }
+                }
+                updateScoreDisplay();
+                if (missCount >= MAX_MISS) {
+                    gameOver();
+                }
+            }
+
+            function gameOver() {
+                state = 'gameover';
+                sfxGameOver();
+                for (let b of bubbles) {
+                    if (b.alive) spawnParticles(b.x, b.y, b.color, 8);
+                }
+                bubbles = [];
+                shakeAmt = 16;
+                updateScoreDisplay();
+                hintText.textContent = '点击屏幕重新开始';
+            }
+
+            function resetGame() {
+                score = 0;
+                comboCount = 0;
+                comboTimer = 0;
+                missCount = 0;
+                shakeAmt = 0;
+                frame = 0;
+                lastBubbleTime = 0;
+                bubbles = [];
+                particles = [];
+                popups = [];
+                state = 'waiting';
+                updateScoreDisplay();
+                hintText.textContent = '点击彩色泡泡 💥 避开红色';
+            }
+
+            function updateScoreDisplay() {
+                scoreDisplay.textContent = Math.floor(score);
+                comboDisplay.textContent = 'x' + Math.max(1, comboCount);
+                if (comboCount >= 10) comboDisplay.style.color = '#ffd740';
+                else if (comboCount >= 5) comboDisplay.style.color = '#ff9a76';
+                else comboDisplay.style.color = '#ffe0a0';
+                if (score > highScore) {
+                    highScore = Math.floor(score);
+                    try { localStorage.setItem('bubblePopHS', highScore); } catch (e) {}
+                }
+                highScoreDisplay.textContent = highScore;
+            }
+
+            function initBgBubbles() {
+                bgBubbles = [];
+                const count = Math.floor((W * H) / 15000);
+                for (let i = 0; i < Math.min(count, 60); i++) {
+                    bgBubbles.push({
+                        x: Math.random() * W,
+                        y: Math.random() * H,
+                        r: 1 + Math.random() * 3,
+                        vy: -0.2 - Math.random() * 0.5,
+                        alpha: 0.08 + Math.random() * 0.12,
+                    });
+                }
+            }
+
+            function update() {
+                frame++;
+                if (shakeAmt > 0) shakeAmt *= 0.85;
+                if (shakeAmt < 0.05) shakeAmt = 0;
+                if (comboTimer > 0) {
+                    comboTimer--;
+                    if (comboTimer <= 0) { comboCount = 0;
+                        updateScoreDisplay(); }
+                }
+
+                if (state === 'playing') {
+                    const spawnInterval = Math.max(18, 40 - Math.floor(score / 80));
+                    if (frame - lastBubbleTime > spawnInterval) spawnBubble();
+
+                    for (let b of bubbles) {
+                        if (!b.alive) continue;
+                        b.y += b.vy;
+                        b.x += b.vx;
+                        b.wobble += b.wobbleSpeed;
+                        b.x += Math.sin(b.wobble) * 0.4;
+                        if (b.x < -b.r) b.x = W + b.r;
+                        if (b.x > W + b.r) b.x = -b.r;
+                        if (b.y < -b.r - 40 && b.name !== 'red') {
+                            b.alive = false;
+                            missCount++;
+                            if (missCount >= MAX_MISS) gameOver();
+                        }
+                        if (b.y < -b.r - 60) b.alive = false;
+                    }
+                    bubbles = bubbles.filter(b => b.alive || b.y > -100);
+                }
+
+                for (let p of particles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life -= p.decay;
+                    p.vy += 0.03;
+                }
+                particles = particles.filter(p => p.life > 0);
+                for (let pp of popups) {
+                    pp.y += pp.vy;
+                    pp.life -= pp.decay;
+                }
+                popups = popups.filter(pp => pp.life > 0);
+                for (let bb of bgBubbles) {
+                    bb.y += bb.vy;
+                    if (bb.y < -10) { bb.y = H + 10;
+                        bb.x = Math.random() * W; }
+                }
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+                let sx = 0,
+                    sy = 0;
+                if (shakeAmt > 0.2) {
+                    sx = (Math.random() - 0.5) * shakeAmt;
+                    sy = (Math.random() - 0.5) * shakeAmt;
+                }
+                ctx.save();
+                ctx.translate(sx, sy);
+
+                const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+                bgGrad.addColorStop(0, '#0d0b2a');
+                bgGrad.addColorStop(0.5, '#151030');
+                bgGrad.addColorStop(1, '#0a081e');
+                ctx.fillStyle = bgGrad;
+                ctx.fillRect(-20, -20, W + 40, H + 40);
+
+                for (let bb of bgBubbles) {
+                    ctx.fillStyle = 'rgba(180,170,220,' + bb.alpha + ')';
+                    ctx.beginPath();
+                    ctx.arc(bb.x, bb.y, bb.r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                for (let i = 0; i < 30; i++) {
+                    const sx2 = ((i * 191 + 67) % W);
+                    const sy2 = ((i * 277 + 31) % H);
+                    const sr2 = ((i * 43) % 2) * 0.4 + 0.4;
+                    const tw = 0.25 + Math.sin(frame * 0.02 + i * 1.8) * 0.3;
+                    ctx.fillStyle = 'rgba(255,255,255,' + tw + ')';
+                    ctx.beginPath();
+                    ctx.arc(sx2, sy2, sr2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                for (let b of bubbles) {
+                    if (!b.alive) continue;
+                    const pulseR = b.r + Math.sin(frame * 0.08 + b.wobble) * b.r * 0.08;
+                    const glowR = pulseR + b.r * 0.5;
+                    const glow = ctx.createRadialGradient(b.x, b.y, pulseR * 0.2, b.x, b.y, glowR);
+                    glow.addColorStop(0, b.glow);
+                    glow.addColorStop(0.6, b.color);
+                    glow.addColorStop(1, 'rgba(0,0,0,0)');
+                    ctx.fillStyle = glow;
+                    ctx.globalAlpha = b.alpha;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, glowR, 0, Math.PI * 2);
+                    ctx.fill();
+                    const bodyGrad = ctx.createRadialGradient(b.x - pulseR * 0.25, b.y - pulseR * 0.3, pulseR * 0.08, b.x, b
+                        .y, pulseR);
+                    bodyGrad.addColorStop(0, '#ffffff');
+                    bodyGrad.addColorStop(0.35, b.glow);
+                    bodyGrad.addColorStop(0.8, b.color);
+                    bodyGrad.addColorStop(1, 'rgba(0,0,0,0.3)');
+                    ctx.fillStyle = bodyGrad;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, pulseR, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                    ctx.beginPath();
+                    ctx.arc(b.x - pulseR * 0.28, b.y - pulseR * 0.32, pulseR * 0.25, 0, Math.PI * 2);
+                    ctx.fill();
+                    if (b.name === 'star') {
+                        ctx.fillStyle = '#fff';
+                        ctx.font = Math.floor(pulseR * 1.2) + 'px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('⭐', b.x, b.y + pulseR * 0.35);
+                    }
+                }
+                ctx.globalAlpha = 1;
+
+                for (let p of particles) {
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+
+                for (let pp of popups) {
+                    ctx.globalAlpha = pp.life;
+                    ctx.fillStyle = pp.color;
+                    ctx.font = 'bold ' + Math.max(13, Math.floor(W * 0.038)) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(pp.text, pp.x, pp.y);
+                }
+                ctx.globalAlpha = 1;
+
+                ctx.restore();
+
+                if (state === 'waiting') {
+                    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                    ctx.fillRect(0, 0, W, H);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold ' + Math.floor(W * 0.06) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🫧 泡泡乐园', W / 2, H / 2 - 20);
+                    ctx.fillStyle = 'rgba(220,210,255,0.7)';
+                    ctx.font = Math.floor(W * 0.033) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.fillText('点击彩色泡泡得分', W / 2, H / 2 + 22);
+                    ctx.fillText('⭐金色稀有  🔴避开红色', W / 2, H / 2 + 48);
+                    ctx.fillText('点击屏幕开始', W / 2, H / 2 + 75);
+                }
+
+                if (state === 'gameover') {
+                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                    ctx.fillRect(0, 0, W, H);
+                    ctx.fillStyle = '#ff7eb3';
+                    ctx.font = 'bold ' + Math.floor(W * 0.065) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('游戏结束', W / 2, H / 2 - 22);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = Math.floor(W * 0.04) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.fillText('得分: ' + Math.floor(score), W / 2, H / 2 + 22);
+                    ctx.fillStyle = '#ffd740';
+                    ctx.font = Math.floor(W * 0.033) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.fillText('点击屏幕重新开始', W / 2, H / 2 + 55);
+                }
+
+                const missed = missCount;
+                const maxM = MAX_MISS;
+                const barW = Math.min(200, W * 0.5);
+                const barH = 6;
+                const barX = W / 2 - barW / 2;
+                const barY = H - 50;
+                ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                ctx.fillRect(barX, barY, barW, barH);
+                const healthRatio = Math.max(0, (maxM - missed) / maxM);
+                const healthColor = healthRatio > 0.5 ? '#7effa0' : healthRatio > 0.25 ? '#ffcc5c' : '#ff3040';
+                ctx.fillStyle = healthColor;
+                ctx.fillRect(barX, barY, barW * healthRatio, barH);
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = Math.floor(W * 0.025) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('生命', W / 2, barY - 8);
+            }
+
+            function gameLoop() {
+                update();
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+            function handleClick(clientX, clientY) {
+                const rect = canvas.getBoundingClientRect();
+                const sx = clientX - rect.left;
+                const sy = clientY - rect.top;
+                const scaleX = W / rect.width;
+                const scaleY = H / rect.height;
+                const cx = sx * scaleX;
+                const cy = sy * scaleY;
+
+                if (state === 'waiting') {
+                    state = 'playing';
+                    hintText.textContent = '点击彩色泡泡 💥 避开红色';
+                    return;
+                }
+                if (state === 'gameover') {
+                    resetGame();
+                    state = 'waiting';
+                    hintText.textContent = '点击彩色泡泡 💥 避开红色';
+                    return;
+                }
+                if (state === 'playing') {
+                    for (let i = bubbles.length - 1; i >= 0; i--) {
+                        const b = bubbles[i];
+                        if (!b.alive) continue;
+                        const dx = cx - b.x;
+                        const dy = cy - b.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < b.r + 8) {
+                            handleBubblePop(b);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            canvas.addEventListener('pointerdown', function(e) {
+                e.preventDefault();
+                initAudio();
+                handleClick(e.clientX, e.clientY);
+            });
+            canvas.addEventListener('pointerup', function(e) {
+                e.preventDefault();
+            });
+            window.addEventListener('keydown', function(e) {
+                if (e.code === 'KeyF') { e.preventDefault();
+                    toggleFullscreen(); }
+                if (e.code === 'KeyM') { e.preventDefault();
+                    btnSound.click(); }
+            });
+
+            function isFullscreen() {
+                return !!(document.fullscreenElement || document.webkitFullscreenElement);
+            }
+            function requestFullscreen() {
+                const el = document.documentElement;
+                if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            }
+            function exitFullscreen() {
+                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+            function toggleFullscreen() {
+                initAudio();
+                if (isFullscreen()) exitFullscreen();
+                else requestFullscreen();
+            }
+            function updateFullscreenIconUI() {
+                const full = isFullscreen();
+                if (full) {
+                    fullscreenIcon.innerHTML =
+                        '<polyline points="4 8 8 4 4 4 4 8"></polyline><polyline points="20 8 16 4 20 4 20 8"></polyline><polyline points="20 16 16 20 20 20 20 16"></polyline><polyline points="4 16 8 20 4 20 4 16"></polyline>';
+                } else {
+                    fullscreenIcon.innerHTML =
+                        '<polyline points="8 3 3 3 3 8"></polyline><polyline points="16 3 21 3 21 8"></polyline><polyline points="21 16 21 21 16 21"></polyline><polyline points="3 16 3 21 8 21"></polyline>';
+                }
+            }
+            btnFullscreen.addEventListener('pointerdown', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                toggleFullscreen();
+            });
+            document.addEventListener('fullscreenchange', function() {
+                updateFullscreenIconUI();
+                setTimeout(resize, 300);
+            });
+            document.addEventListener('webkitfullscreenchange', function() {
+                updateFullscreenIconUI();
+                setTimeout(resize, 300);
+            });
+            updateFullscreenIconUI();
+
+            btnSound.addEventListener('pointerdown', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                initAudio();
+                soundEnabled = !soundEnabled;
+                updateSoundIcon();
+                if (soundEnabled && audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+            });
+
+            function init() {
+                resize();
+                try { const s = localStorage.getItem('bubblePopHS'); if (s) highScore = parseInt(s) || 0; } catch (
+                e) { highScore = 0; }
+                resetGame();
+                initBgBubbles();
+                updateScoreDisplay();
+                updateSoundIcon();
+                updateFullscreenIconUI();
+            }
+            init();
+            gameLoop();
+        })();
+    </script>
+</body>
+</html>

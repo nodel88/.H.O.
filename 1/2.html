@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌿 分形花园 · Fractal Garden</title>
+    <style>
+        :root {
+            --bg: #040b14;
+            --surface: rgba(10, 16, 32, 0.7);
+            --gold: #f0c060;
+            --amber: #e8943a;
+            --rose: #f06292;
+            --cyan: #4dd0e1;
+            --violet: #b39ddb;
+            --danger: #ff3860;
+            --text: #e8e0f0;
+            --text-dim: #8899bb;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            background: var(--bg);
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            cursor: none;
+            position: relative;
+        }
+
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: block;
+        }
+
+        .ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .ui-layer>* {
+            pointer-events: auto;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 36px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 36px rgba(0, 0, 0, 0.5);
+            z-index: 20;
+        }
+        .info-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .info-val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            min-width: 32px;
+            text-align: center;
+        }
+        .info-val.score { color: var(--gold); text-shadow: 0 0 18px rgba(240,192,96,0.6); }
+        .info-val.lives { color: var(--rose); letter-spacing: 3px; text-shadow: 0 0 14px rgba(240,98,146,0.5); }
+        .info-val.combo { color: var(--cyan); text-shadow: 0 0 14px rgba(77,208,225,0.5); }
+        .info-sep {
+            width: 1px; height: 18px; background: rgba(255,255,255,0.12); border-radius: 1px;
+        }
+
+        .corner-btns {
+            position: absolute; top: 22px; right: 20px; display: flex; flex-direction: column; gap: 12px; z-index: 30;
+        }
+        .geo-btn {
+            width: 48px; height: 48px; border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.25);
+            background: var(--surface);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.35s cubic-bezier(0.25,0.8,0.25,1.2);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+            outline: none; -webkit-tap-highlight-color: transparent; position: relative;
+        }
+        .geo-btn::after {
+            content: ''; position: absolute; inset: -6px; border-radius: 50%;
+            border: 1.5px solid transparent; transition: all 0.4s ease; pointer-events: none;
+        }
+        .geo-btn:hover::after {
+            border-color: rgba(255,255,255,0.45);
+            box-shadow: 0 0 32px rgba(176,160,220,0.35), 0 0 60px rgba(176,160,220,0.12);
+        }
+        .geo-btn:active { transform: scale(0.88); transition: transform 0.1s ease; }
+        .geo-btn svg { width: 20px; height: 20px; fill: none; stroke: #ddd; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .geo-btn .emoji-icon { font-size: 1.15rem; line-height: 1; }
+
+        .start-hint {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) translateY(60px);
+            color: rgba(255,255,255,0.5); font-size: 0.85rem; letter-spacing: 3px; text-align: center;
+            z-index: 25; transition: opacity 0.7s; pointer-events: none;
+        }
+        .start-hint.hidden { opacity: 0; }
+
+        .bottom-hint {
+            position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+            color: rgba(255,255,255,0.35); font-size: 0.7rem; letter-spacing: 2px; text-align: center;
+            z-index: 25; transition: opacity 0.6s; pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .info-panel { gap: 10px; padding: 10px 16px; border-radius: 28px; top: 12px; }
+            .info-cell { font-size: 0.65rem; gap: 5px; letter-spacing: 0.8px; }
+            .info-val { font-size: 1rem; min-width: 24px; }
+            .geo-btn { width: 40px; height: 40px; }
+            .geo-btn svg { width: 17px; height: 17px; }
+            .corner-btns { top: 14px; right: 10px; gap: 8px; }
+            .bottom-hint { bottom: 14px; font-size: 0.6rem; letter-spacing: 1px; }
+            .start-hint { font-size: 0.7rem; letter-spacing: 2px; }
+        }
+        @media (max-width: 400px) {
+            .info-panel { gap: 6px; padding: 8px 12px; border-radius: 22px; top: 8px; }
+            .info-cell { font-size: 0.55rem; gap: 3px; }
+            .info-val { font-size: 0.8rem; min-width: 18px; }
+            .geo-btn { width: 34px; height: 34px; }
+            .geo-btn svg { width: 14px; height: 14px; }
+            .corner-btns { top: 8px; right: 6px; gap: 6px; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div class="ui-layer">
+        <div class="info-panel" id="infoPanel">
+            <div class="info-cell"><span>✦ 得分</span><span class="info-val score" id="scoreDisplay">0</span></div>
+            <div class="info-sep"></div>
+            <div class="info-cell"><span>生命</span><span class="info-val lives" id="livesDisplay">● ● ●</span></div>
+            <div class="info-sep"></div>
+            <div class="info-cell"><span>连击</span><span class="info-val combo" id="comboDisplay">×1</span></div>
+        </div>
+        <div class="corner-btns">
+            <button class="geo-btn" id="btnFullscreen" title="全屏模式" aria-label="全屏切换">
+                <svg viewBox="0 0 24 24"><polyline points="8 3 3 3 3 8"></polyline><polyline points="16 3 21 3 21 8"></polyline><polyline points="21 16 21 21 16 21"></polyline><polyline points="3 16 3 21 8 21"></polyline></svg>
+            </button>
+            <button class="geo-btn" id="btnSound" title="音效开关" aria-label="音效切换">
+                <span class="emoji-icon" id="soundIcon">🔊</span>
+            </button>
+            <button class="geo-btn" id="btnRestart" title="重新开始" aria-label="重新开始">
+                <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M4 15a9 9 0 1 0 3-11.7"></path></svg>
+            </button>
+        </div>
+        <div class="start-hint" id="startHint">移动光标 · 收集金色光点</div>
+        <div class="bottom-hint" id="bottomHint">空格键开始 | F 全屏 | M 音效</div>
+    </div>
+
+    <script>
+        (function() {
+            // DOM元素
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const livesDisplay = document.getElementById('livesDisplay');
+            const comboDisplay = document.getElementById('comboDisplay');
+            const btnFullscreen = document.getElementById('btnFullscreen');
+            const btnSound = document.getElementById('btnSound');
+            const soundIcon = document.getElementById('soundIcon');
+            const btnRestart = document.getElementById('btnRestart');
+            const startHint = document.getElementById('startHint');
+            const bottomHint = document.getElementById('bottomHint');
+
+            let W, H;
+            function resizeCanvas() {
+                W = window.innerWidth;
+                H = window.innerHeight;
+                canvas.width = W;
+                canvas.height = H;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                buildTreeStructure();
+                renderSierpinski();
+                if (player.x > W) player.x = W - 30;
+                if (player.y > H) player.y = H - 30;
+            });
+
+            // 音效引擎
+            let audioCtx = null;
+            let soundEnabled = true;
+            function initAudio() {
+                if (!audioCtx) {
+                    try { audioCtx = new(window.AudioContext || window.webkitAudioContext)(); } catch (e) {
+                        soundEnabled = false;
+                        updateSoundIcon();
+                        return;
+                    }
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            }
+            function playSound(freq, type, duration, vol = 0.05, glideTo = null) {
+                if (!soundEnabled || !audioCtx) return;
+                try {
+                    const t = audioCtx.currentTime;
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, t);
+                    if (glideTo) osc.frequency.linearRampToValueAtTime(glideTo, t + duration);
+                    gain.gain.setValueAtTime(vol, t);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.start(t); osc.stop(t + duration);
+                } catch (e) {}
+            }
+            function sfxCollect() { playSound(700,'sine',0.08,0.06); playSound(1050,'sine',0.04,0.09,1400); }
+            function sfxCombo() { playSound(500,'sine',0.04,0.05); playSound(800,'triangle',0.03,0.07,1100); playSound(1300,'sine',0.02,0.08); }
+            function sfxHurt() { playSound(35,'sawtooth',0.2,0.4,18); playSound(55,'square',0.1,0.25); }
+            function sfxGameOver() { playSound(25,'sawtooth',0.3,0.8,12); }
+            function sfxStart() { playSound(200,'sine',0.06,0.1,600); playSound(400,'triangle',0.04,0.15,900); }
+            function updateSoundIcon() { soundIcon.textContent = soundEnabled ? '🔊' : '🔇'; }
+
+            // 游戏状态
+            let gameState = 'waiting';
+            let score = 0, lives = 3, comboCount = 0, comboTimer = 0;
+            const COMBO_TIMEOUT = 80;
+            let invincibleTimer = 0, shakeAmount = 0, globalTime = 0;
+
+            const player = {
+                x: 0, y: 0, r: 14, targetX: 0, targetY: 0,
+                trail: [], maxTrail: 18, glowPhase: 0
+            };
+            function initPlayerPosition() {
+                player.x = W/2; player.y = H*0.55;
+                player.targetX = player.x; player.targetY = player.y;
+                player.trail = [];
+            }
+
+            const TREE_DEPTH = 8;
+            const treeRoot = { x:0, y:0, angle:-Math.PI/2, length:0, depth:0, children:[] };
+            let treeNodeWorldPositions = [];
+            let fruitNodes = [];
+
+            function buildTreeStructure() {
+                treeRoot.x = W/2;
+                treeRoot.y = H*0.78;
+                treeRoot.length = Math.min(H*0.32, W*0.22);
+                treeRoot.angle = -Math.PI/2;
+                treeRoot.depth = 0;
+                treeRoot.children = [];
+                fruitNodes = [];
+                treeNodeWorldPositions = [];
+                buildSubTree(treeRoot, TREE_DEPTH);
+                // 果实由computeTreeWorldPositions动态添加并初始化
+            }
+
+            function buildSubTree(parent, maxDepth) {
+                if (parent.depth >= maxDepth) return;
+                const numBranches = parent.depth < 3 ? 3 : 2;
+                const baseAngleOffset = 0.28 + parent.depth*0.02;
+                const lengthDecay = 0.68 + parent.depth*0.015;
+                for (let i=0; i<numBranches; i++) {
+                    let angleOffset = numBranches===3 ? (i-1)*baseAngleOffset : (i===0?-1:1)*baseAngleOffset;
+                    angleOffset += (Math.random()-0.5)*0.15;
+                    const child = {
+                        x:0, y:0, angle: parent.angle + angleOffset,
+                        length: parent.length * (lengthDecay + (Math.random()-0.5)*0.06),
+                        depth: parent.depth+1, children: [], phaseOffset: Math.random()*Math.PI*2
+                    };
+                    parent.children.push(child);
+                    buildSubTree(child, maxDepth);
+                }
+            }
+
+            function computeTreeWorldPositions(node, parentX, parentY, time) {
+                const swayAmp = 0.025 * (node.depth/TREE_DEPTH);
+                const sway = Math.sin(time*1.8 + node.depth*0.3 + node.phaseOffset) * swayAmp;
+                const effectiveAngle = node.angle + sway;
+                const wx = parentX + Math.cos(effectiveAngle)*node.length;
+                const wy = parentY + Math.sin(effectiveAngle)*node.length;
+                node.worldX = wx; node.worldY = wy;
+                treeNodeWorldPositions.push({ x:wx, y:wy, depth:node.depth, parentX, parentY });
+                // 果实节点：深度>=6且没有子节点的末端
+                if (node.depth >= 6 && node.children.length === 0) {
+                    if (!node._fruitInit) {
+                        node._fruitInit = true;
+                        node.maturity = Math.random() * 180;
+                        node.maxMaturity = 160 + Math.random()*140;
+                        node.cooldown = 0;
+                        node.alive = true;
+                        fruitNodes.push(node);
+                    }
+                }
+                for (const child of node.children) {
+                    computeTreeWorldPositions(child, wx, wy, time);
+                }
+            }
+
+            let thorns = [];
+            function initThorns() {
+                thorns = [];
+                const count = 4;
+                for (let i=0; i<count; i++) {
+                    thorns.push({
+                        orbitRadius: treeRoot.length*(0.35+Math.random()*0.55),
+                        angle: (i/count)*Math.PI*2 + Math.random()*0.4,
+                        speed: 0.008 + Math.random()*0.016,
+                        size: 16 + Math.random()*22,
+                        phaseOffset: Math.random()*Math.PI*2,
+                    });
+                }
+            }
+            function updateThorns(time) {
+                for (const thorn of thorns) {
+                    thorn.angle += thorn.speed;
+                    if (thorn.angle > Math.PI*2) thorn.angle -= Math.PI*2;
+                    thorn.worldX = treeRoot.x + Math.cos(thorn.angle)*thorn.orbitRadius;
+                    thorn.worldY = treeRoot.y + Math.sin(thorn.angle)*thorn.orbitRadius*0.7;
+                }
+            }
+
+            let particles = [];
+            function spawnParticles(x, y, color, count=14) {
+                for (let i=0; i<count; i++) {
+                    const angle = Math.random()*Math.PI*2;
+                    const speed = Math.random()*5+2;
+                    particles.push({
+                        x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed - Math.random()*2,
+                        life:1, decay:0.018+Math.random()*0.04, color, r:Math.random()*2.5+1
+                    });
+                }
+            }
+            function updateParticles() {
+                for (const p of particles) { p.x+=p.vx; p.y+=p.vy; p.life-=p.decay; p.vy+=0.03; }
+                particles = particles.filter(p=>p.life>0);
+            }
+
+            // 谢尔宾斯基背景
+            let sierpinskiCanvas = null;
+            function renderSierpinski() {
+                if (!sierpinskiCanvas) sierpinskiCanvas = document.createElement('canvas');
+                sierpinskiCanvas.width = W; sierpinskiCanvas.height = H;
+                const sctx = sierpinskiCanvas.getContext('2d');
+                sctx.clearRect(0,0,W,H);
+                const cx = W/2, cy = H*0.42, size = Math.min(W,H)*0.55;
+                const h = size*Math.sqrt(3)/2;
+                const x1 = cx, y1 = cy - h*0.55;
+                const x2 = cx - size/2, y2 = cy + h*0.45;
+                const x3 = cx + size/2, y3 = cy + h*0.45;
+                drawSierpinskiRecursive(sctx, x1,y1, x2,y2, x3,y3, 5);
+            }
+            function drawSierpinskiRecursive(sctx, x1,y1, x2,y2, x3,y3, depth) {
+                if (depth <= 0) {
+                    sctx.fillStyle = 'rgba(120,100,160,0.06)';
+                    sctx.beginPath(); sctx.moveTo(x1,y1); sctx.lineTo(x2,y2); sctx.lineTo(x3,y3); sctx.closePath(); sctx.fill();
+                    sctx.strokeStyle = 'rgba(160,140,200,0.1)'; sctx.lineWidth=0.5; sctx.stroke();
+                    return;
+                }
+                const mx1=(x1+x2)/2, my1=(y1+y2)/2;
+                const mx2=(x2+x3)/2, my2=(y2+y3)/2;
+                const mx3=(x1+x3)/2, my3=(y1+y3)/2;
+                drawSierpinskiRecursive(sctx, x1,y1, mx1,my1, mx3,my3, depth-1);
+                drawSierpinskiRecursive(sctx, mx1,my1, x2,y2, mx2,my2, depth-1);
+                drawSierpinskiRecursive(sctx, mx3,my3, mx2,my2, x3,y3, depth-1);
+            }
+
+            // 科赫雪花
+            function drawKochSnowflake(ctx, cx, cy, size, depth, time) {
+                const rotation = time*0.08;
+                const points = [];
+                for (let i=0; i<3; i++) {
+                    const angle = rotation + i*Math.PI*2/3 - Math.PI/2;
+                    points.push({ x: cx+Math.cos(angle)*size, y: cy+Math.sin(angle)*size });
+                }
+                ctx.strokeStyle = 'rgba(140,180,220,0.12)'; ctx.lineWidth=1;
+                ctx.shadowColor = 'rgba(140,180,220,0.08)'; ctx.shadowBlur=10;
+                for (let i=0; i<3; i++) drawKochSegment(ctx, points[i].x, points[i].y, points[(i+1)%3].x, points[(i+1)%3].y, depth);
+                ctx.shadowBlur = 0;
+            }
+            function drawKochSegment(ctx, x1, y1, x2, y2, depth) {
+                if (depth <= 0) { ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); return; }
+                const dx=x2-x1, dy=y2-y1, dist=Math.sqrt(dx*dx+dy*dy), angle=Math.atan2(dy,dx);
+                const third=dist/3, h=third*Math.sqrt(3)/2;
+                const pA={x:x1+dx/3, y:y1+dy/3}, pB={x:x2-dx/3, y:y2-dy/3};
+                const midX=(x1+x2)/2, midY=(y1+y2)/2;
+                const perpX=midX - Math.sin(angle)*h, perpY=midY + Math.cos(angle)*h;
+                drawKochSegment(ctx, x1,y1, pA.x,pA.y, depth-1);
+                drawKochSegment(ctx, pA.x,pA.y, perpX,perpY, depth-1);
+                drawKochSegment(ctx, perpX,perpY, pB.x,pB.y, depth-1);
+                drawKochSegment(ctx, pB.x,pB.y, x2,y2, depth-1);
+            }
+
+            function resetGame() {
+                score=0; lives=3; comboCount=0; comboTimer=0; invincibleTimer=0; shakeAmount=0; globalTime=0;
+                particles=[]; fruitNodes=[]; treeNodeWorldPositions=[];
+                buildTreeStructure(); initThorns(); initPlayerPosition();
+                renderSierpinski(); updateDisplays();
+            }
+            function updateDisplays() {
+                scoreDisplay.textContent = score;
+                let lstr = '';
+                for (let i=0; i<3; i++) lstr += i<lives ? '● ' : '○ ';
+                livesDisplay.textContent = lstr.trim();
+                comboDisplay.textContent = '×'+Math.max(1, comboCount);
+                if (comboCount>=7) comboDisplay.style.color='#ffb347';
+                else if (comboCount>=3) comboDisplay.style.color='#f06292';
+                else comboDisplay.style.color='#4dd0e1';
+            }
+            function updateUIForState() {
+                if (gameState==='waiting') { startHint.classList.remove('hidden'); bottomHint.style.opacity='1'; }
+                else if (gameState==='playing') { startHint.classList.add('hidden'); bottomHint.style.opacity='0.3'; }
+                else { startHint.classList.add('hidden'); bottomHint.style.opacity='0.5'; }
+            }
+
+            function update() {
+                globalTime += 0.016;
+                if (gameState !== 'playing') {
+                    updateThorns(globalTime); updateParticles();
+                    // 更新果实成熟度（等待时也长果实）
+                    for (const fn of fruitNodes) {
+                        if (fn.alive && fn.maturity < fn.maxMaturity) fn.maturity += 0.7;
+                        else if (!fn.alive) { fn.cooldown--; if (fn.cooldown<=0) { fn.alive=true; fn.maturity=0; fn.maxMaturity=140+Math.random()*160; } }
+                    }
+                    player.x += (player.targetX - player.x)*0.2;
+                    player.y += (player.targetY - player.y)*0.2;
+                    player.x = Math.max(player.r, Math.min(W-player.r, player.x));
+                    player.y = Math.max(player.r, Math.min(H-player.r, player.y));
+                    player.glowPhase += 0.04;
+                    player.trail.push({x:player.x, y:player.y, life:1, r:player.r});
+                    if (player.trail.length > player.maxTrail) player.trail.shift();
+                    for (let t of player.trail) t.life -= 0.05;
+                    player.trail = player.trail.filter(t=>t.life>0);
+                    return;
+                }
+
+                if (comboTimer>0) { comboTimer--; if (comboTimer<=0) { comboCount=0; updateDisplays(); } }
+                if (invincibleTimer>0) invincibleTimer--;
+                if (shakeAmount>0) shakeAmount *= 0.85;
+                if (shakeAmount<0.04) shakeAmount=0;
+
+                player.x += (player.targetX - player.x)*0.22;
+                player.y += (player.targetY - player.y)*0.22;
+                player.x = Math.max(player.r, Math.min(W-player.r, player.x));
+                player.y = Math.max(player.r, Math.min(H-player.r, player.y));
+                player.glowPhase += 0.05;
+                player.trail.push({x:player.x, y:player.y, life:1, r:player.r});
+                if (player.trail.length > player.maxTrail) player.trail.shift();
+                for (let t of player.trail) t.life -= 0.045;
+                player.trail = player.trail.filter(t=>t.life>0);
+
+                updateThorns(globalTime);
+                for (const fn of fruitNodes) {
+                    if (fn.alive && fn.maturity < fn.maxMaturity) fn.maturity += 0.7;
+                    else if (!fn.alive) { fn.cooldown--; if (fn.cooldown<=0) { fn.alive=true; fn.maturity=0; fn.maxMaturity=140+Math.random()*160; } }
+                }
+                updateParticles();
+
+                // 碰撞：果实
+                for (const fn of fruitNodes) {
+                    if (!fn.alive || fn.maturity < fn.maxMaturity || !fn.worldX) continue;
+                    const dx = player.x - fn.worldX, dy = player.y - fn.worldY;
+                    if (Math.sqrt(dx*dx+dy*dy) < player.r+20) {
+                        score += 15 + Math.floor(comboCount/3)*8;
+                        comboCount++; comboTimer = COMBO_TIMEOUT;
+                        if (comboCount>=6 && comboCount%3===0) sfxCombo(); else sfxCollect();
+                        spawnParticles(fn.worldX, fn.worldY, '#f0c060', 16);
+                        spawnParticles(fn.worldX, fn.worldY, '#ffffff', 6);
+                        fn.alive = false; fn.cooldown = 90+Math.random()*160; fn.maturity = 0;
+                        updateDisplays();
+                    }
+                }
+                // 碰撞：荆棘
+                if (invincibleTimer<=0) {
+                    for (const thorn of thorns) {
+                        const dx = player.x - thorn.worldX, dy = player.y - thorn.worldY;
+                        if (Math.sqrt(dx*dx+dy*dy) < player.r + thorn.size*0.55) {
+                            sfxHurt();
+                            spawnParticles(player.x, player.y, '#ff3860', 30);
+                            shakeAmount = 18; lives--; comboCount=0; comboTimer=0; invincibleTimer=100;
+                            updateDisplays();
+                            if (lives<=0) {
+                                gameState='gameover'; sfxGameOver();
+                                spawnParticles(player.x, player.y, '#ffffff', 50);
+                                updateUIForState(); return;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            function draw() {
+                ctx.clearRect(0,0,W,H);
+                let sx=0, sy=0;
+                if (shakeAmount>0.2) { sx=(Math.random()-0.5)*shakeAmount; sy=(Math.random()-0.5)*shakeAmount; }
+                ctx.save(); ctx.translate(sx,sy);
+
+                const bgGrad = ctx.createRadialGradient(W/2, H*0.4, W*0.2, W/2, H*0.5, W*1.1);
+                bgGrad.addColorStop(0,'#0a1228'); bgGrad.addColorStop(0.5,'#050d1a'); bgGrad.addColorStop(1,'#010508');
+                ctx.fillStyle = bgGrad; ctx.fillRect(-20,-20,W+40,H+40);
+
+                if (sierpinskiCanvas) { ctx.globalAlpha=0.55; ctx.drawImage(sierpinskiCanvas,0,0); ctx.globalAlpha=1; }
+                drawKochSnowflake(ctx, W/2, H*0.35, Math.min(W,H)*0.38, 3, globalTime);
+
+                treeNodeWorldPositions = [];
+                computeTreeWorldPositions(treeRoot, treeRoot.x, treeRoot.y, globalTime);
+                const sorted = [...treeNodeWorldPositions].sort((a,b)=>a.depth-b.depth);
+                for (const node of sorted) {
+                    const dp = node.depth/TREE_DEPTH;
+                    const thick = Math.max(1, 8*(1-dp)*(1-dp));
+                    const r = Math.floor(80+dp*160), g = Math.floor(30+dp*140), b = Math.floor(60+dp*100 - dp*dp*80);
+                    ctx.strokeStyle = `rgba(${r},${g},${b},${0.75+dp*0.25})`;
+                    ctx.lineWidth = thick; ctx.lineCap='round';
+                    if (dp>0.7) { ctx.shadowColor=`rgba(240,180,80,${0.3+dp*0.5})`; ctx.shadowBlur=6+dp*10; }
+                    ctx.beginPath(); ctx.moveTo(node.parentX, node.parentY); ctx.lineTo(node.x, node.y); ctx.stroke();
+                    ctx.shadowBlur=0;
+                    if (node.depth>=4 && node.depth<6) {
+                        const grd = ctx.createRadialGradient(node.x,node.y,0,node.x,node.y,4+dp*3);
+                        grd.addColorStop(0,'rgba(255,220,150,0.7)'); grd.addColorStop(1,'rgba(255,180,80,0)');
+                        ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(node.x,node.y,4+dp*3,0,Math.PI*2); ctx.fill();
+                    }
+                }
+
+                for (const fn of fruitNodes) {
+                    if (!fn.alive || !fn.worldX) continue;
+                    const mat = Math.min(1, fn.maturity/fn.maxMaturity);
+                    const fruitR = 5 + mat*10;
+                    const glowR = fruitR+6+Math.sin(globalTime*3+fn.phaseOffset)*4;
+                    const glowGrad = ctx.createRadialGradient(fn.worldX,fn.worldY,fruitR*0.3, fn.worldX,fn.worldY,glowR);
+                    if (mat>=0.95) { glowGrad.addColorStop(0,'rgba(255,220,100,0.95)'); glowGrad.addColorStop(0.5,'rgba(255,180,50,0.5)'); glowGrad.addColorStop(1,'rgba(255,140,30,0)'); }
+                    else { glowGrad.addColorStop(0,'rgba(200,180,140,0.6)'); glowGrad.addColorStop(0.5,'rgba(180,150,100,0.25)'); glowGrad.addColorStop(1,'rgba(150,120,80,0)'); }
+                    ctx.fillStyle=glowGrad; ctx.beginPath(); ctx.arc(fn.worldX,fn.worldY,glowR,0,Math.PI*2); ctx.fill();
+                    const coreGrad = ctx.createRadialGradient(fn.worldX,fn.worldY,0, fn.worldX,fn.worldY,fruitR);
+                    if (mat>=0.95) { coreGrad.addColorStop(0,'#ffffff'); coreGrad.addColorStop(0.4,'#ffe8a0'); coreGrad.addColorStop(1,'#f0a030'); }
+                    else { coreGrad.addColorStop(0,'#ddd8cc'); coreGrad.addColorStop(0.4,'#c8b898'); coreGrad.addColorStop(1,'#8a7050'); }
+                    ctx.fillStyle=coreGrad; ctx.beginPath(); ctx.arc(fn.worldX,fn.worldY,fruitR,0,Math.PI*2); ctx.fill();
+                }
+
+                for (const thorn of thorns) {
+                    const tx=thorn.worldX, ty=thorn.worldY, tipLen=thorn.size, baseW=thorn.size*0.35;
+                    const glow = ctx.createRadialGradient(tx,ty,baseW, tx,ty,tipLen+8);
+                    glow.addColorStop(0,'rgba(255,60,90,0.6)'); glow.addColorStop(0.5,'rgba(200,30,60,0.25)'); glow.addColorStop(1,'rgba(150,10,30,0)');
+                    ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(tx,ty,tipLen+8,0,Math.PI*2); ctx.fill();
+                    const tipX=tx+Math.cos(thorn.angle)*tipLen, tipY=ty+Math.sin(thorn.angle)*tipLen;
+                    const perpX=-Math.sin(thorn.angle)*baseW, perpY=Math.cos(thorn.angle)*baseW;
+                    const grad = ctx.createLinearGradient(tx,ty, tipX,tipY);
+                    grad.addColorStop(0,'#ff3860'); grad.addColorStop(0.5,'#e02050'); grad.addColorStop(1,'#8b0020');
+                    ctx.fillStyle=grad; ctx.beginPath(); ctx.moveTo(tipX,tipY); ctx.lineTo(tx+perpX,ty+perpY); ctx.lineTo(tx-perpX,ty-perpY); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle='rgba(255,120,150,0.7)'; ctx.lineWidth=1.5; ctx.stroke();
+                }
+
+                for (let i=0; i<player.trail.length; i++) {
+                    const t=player.trail[i], alpha=t.life*0.4, r=t.r*t.life*0.7;
+                    ctx.fillStyle=`rgba(160,210,255,${alpha})`; ctx.beginPath(); ctx.arc(t.x,t.y,r,0,Math.PI*2); ctx.fill();
+                }
+                if (invincibleTimer>0 && gameState==='playing') {
+                    const shieldR=player.r+12+Math.sin(globalTime*8)*3;
+                    ctx.strokeStyle=`rgba(180,160,220,${0.4+Math.sin(globalTime*6)*0.3})`; ctx.lineWidth=2.5;
+                    ctx.shadowColor='rgba(180,160,220,0.7)'; ctx.shadowBlur=18;
+                    ctx.setLineDash([8,5]); ctx.lineDashOffset=globalTime*40;
+                    ctx.beginPath(); ctx.arc(player.x,player.y,shieldR,0,Math.PI*2); ctx.stroke();
+                    ctx.setLineDash([]); ctx.shadowBlur=0;
+                }
+                const pGlowR=player.r+18+Math.sin(player.glowPhase)*5;
+                const pGlow=ctx.createRadialGradient(player.x,player.y,player.r*0.4, player.x,player.y,pGlowR);
+                pGlow.addColorStop(0,'rgba(200,240,255,0.85)'); pGlow.addColorStop(0.35,'rgba(100,200,240,0.5)'); pGlow.addColorStop(0.7,'rgba(40,120,200,0.12)'); pGlow.addColorStop(1,'rgba(10,40,100,0)');
+                ctx.fillStyle=pGlow; ctx.beginPath(); ctx.arc(player.x,player.y,pGlowR,0,Math.PI*2); ctx.fill();
+                const coreGrad=ctx.createRadialGradient(player.x-player.r*0.2,player.y-player.r*0.2,player.r*0.08, player.x,player.y,player.r);
+                coreGrad.addColorStop(0,'#ffffff'); coreGrad.addColorStop(0.3,'#e0f4ff'); coreGrad.addColorStop(0.7,'#40b8e8'); coreGrad.addColorStop(1,'#105890');
+                ctx.fillStyle=coreGrad; ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(player.x-player.r*0.22,player.y-player.r*0.28,player.r*0.3,0,Math.PI*2); ctx.fill();
+
+                for (const p of particles) {
+                    ctx.globalAlpha=p.life;
+                    ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2); ctx.fill();
+                }
+                ctx.globalAlpha=1;
+                ctx.restore();
+
+                if (gameState==='gameover') {
+                    ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,H);
+                    ctx.fillStyle='#fff'; ctx.font='bold clamp(22px,5vw,44px) "PingFang SC","Microsoft YaHei",sans-serif'; ctx.textAlign='center';
+                    ctx.fillText('分 形 凋 零', W/2, H/2-15);
+                    ctx.fillStyle='#f0c060'; ctx.font='clamp(13px,2.5vw,20px) "PingFang SC","Microsoft YaHei",sans-serif';
+                    ctx.fillText('最终得分: '+score+'  |  点击 ↻ 重新开始', W/2, H/2+40);
+                }
+            }
+
+            function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+
+            function updatePlayerTarget(cx,cy) { player.targetX=cx; player.targetY=cy; }
+            window.addEventListener('mousemove', e=>updatePlayerTarget(e.clientX,e.clientY));
+            window.addEventListener('touchmove', e=>{ if(e.touches.length>0) updatePlayerTarget(e.touches[0].clientX,e.touches[0].clientY); }, {passive:true});
+            window.addEventListener('touchstart', e=>{
+                initAudio(); if(e.touches.length>0) updatePlayerTarget(e.touches[0].clientX,e.touches[0].clientY);
+                if(gameState==='waiting'||gameState==='gameover') startGame();
+            }, {passive:true});
+            canvas.addEventListener('click', ()=>{
+                initAudio(); if(gameState==='waiting'||gameState==='gameover') startGame();
+            });
+            function startGame() { resetGame(); gameState='playing'; updateUIForState(); updateDisplays(); sfxStart(); }
+
+            window.addEventListener('keydown', e=>{
+                if (e.code==='Space'||e.code==='Enter') { e.preventDefault(); initAudio(); if(gameState==='waiting'||gameState==='gameover') startGame(); }
+                if (e.code==='KeyF') { e.preventDefault(); btnFullscreen.click(); }
+                if (e.code==='KeyM') { e.preventDefault(); btnSound.click(); }
+                const ms=35;
+                if (e.code==='ArrowLeft'||e.code==='KeyA') player.targetX-=ms;
+                if (e.code==='ArrowRight'||e.code==='KeyD') player.targetX+=ms;
+                if (e.code==='ArrowUp'||e.code==='KeyW') player.targetY-=ms;
+                if (e.code==='ArrowDown'||e.code==='KeyS') player.targetY+=ms;
+                player.targetX=Math.max(0,Math.min(W,player.targetX));
+                player.targetY=Math.max(0,Math.min(H,player.targetY));
+            });
+
+            btnFullscreen.addEventListener('click', e=>{
+                e.stopPropagation(); initAudio();
+                if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                    const el=document.documentElement;
+                    if(el.requestFullscreen) el.requestFullscreen(); else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                } else { if(document.exitFullscreen) document.exitFullscreen(); else if(document.webkitExitFullscreen) document.webkitExitFullscreen(); }
+            });
+            btnSound.addEventListener('click', e=>{ e.stopPropagation(); initAudio(); soundEnabled=!soundEnabled; updateSoundIcon(); if(soundEnabled&&audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); });
+            btnRestart.addEventListener('click', e=>{ e.stopPropagation(); initAudio(); startGame(); });
+
+            function updateFullscreenIcon() {
+                const isFull = document.fullscreenElement || document.webkitFullscreenElement;
+                const svg = btnFullscreen.querySelector('svg');
+                if (isFull) svg.innerHTML = '<polyline points="4 8 8 4 4 4 4 8"></polyline><polyline points="20 8 16 4 20 4 20 8"></polyline><polyline points="20 16 16 20 20 20 20 16"></polyline><polyline points="4 16 8 20 4 20 4 16"></polyline>';
+                else svg.innerHTML = '<polyline points="8 3 3 3 3 8"></polyline><polyline points="16 3 21 3 21 8"></polyline><polyline points="21 16 21 21 16 21"></polyline><polyline points="3 16 3 21 8 21"></polyline>';
+            }
+            document.addEventListener('fullscreenchange', updateFullscreenIcon);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+            updateFullscreenIcon();
+
+            function init() {
+                resizeCanvas(); initPlayerPosition();
+                buildTreeStructure(); initThorns(); renderSierpinski();
+                // 第一次计算世界坐标，初始化果实
+                treeNodeWorldPositions=[];
+                computeTreeWorldPositions(treeRoot, treeRoot.x, treeRoot.y, 0);
+                updateDisplays(); updateUIForState(); updateSoundIcon();
+                gameState='waiting';
+            }
+            init();
+            gameLoop();
+
+            window.addEventListener('resize', ()=>{
+                renderSierpinski();
+            });
+
+            console.log('🌿 分形花园 · Fractal Garden 已就绪');
+        })();
+    </script>
+</body>
+</html>

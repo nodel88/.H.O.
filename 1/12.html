@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=yes, minimal-ui, interactive-widget=resizes-content">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <title>999关 · 永恒艺术之旅</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a0a;
+      font-family: 'Segoe UI', 'PingFang SC', 'Helvetica Neue', system-ui, sans-serif;
+      touch-action: pan-x pan-y pinch-zoom;
+    }
+    #gameContainer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0a 100%);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: transparent;
+    }
+    .fullscreen-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 56px;
+      height: 56px;
+      background: rgba(30, 30, 50, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1.5px solid rgba(255, 220, 240, 0.6);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffe9f0;
+      font-size: 28px;
+      cursor: pointer;
+      z-index: 999;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 20px rgba(255, 180, 200, 0.5);
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .fullscreen-btn:active {
+      transform: scale(0.92);
+      background: rgba(70, 50, 90, 0.85);
+      border-color: #ffb7c5;
+      box-shadow: 0 0 30px #ff99bb;
+    }
+    @media (max-width: 768px) {
+      .fullscreen-btn {
+        width: 50px;
+        height: 50px;
+        bottom: 18px;
+        right: 18px;
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="artCanvas"></canvas>
+  </div>
+  <button class="fullscreen-btn" id="fullscreenToggle" title="全屏模式">⛶</button>
+
+  <script>
+    (function() {
+      const canvas = document.getElementById('artCanvas');
+      const ctx = canvas.getContext('2d');
+
+      const TOTAL_LEVELS = 999;
+      let currentLevel = 1;
+      let player = { x: 0, y: 0, radius: 0 };
+      let targets = [];
+      let obstacles = [];
+      let particles = [];
+      let ambientParticles = [];
+      let levelTransition = 0;
+      let transitionDirection = 0;
+      let gameCompleted = false;
+      let canvasWidth = 0;
+      let canvasHeight = 0;
+      let pointerX = 0;
+      let pointerY = 0;
+      let pointerActive = false;
+      let gameStarted = false;
+
+      let audioCtx = null;
+      let masterGain = null;
+      let musicGain = null;
+      let sfxGain = null;
+      let currentMusicNodes = [];
+      let pianoInterval = null;
+      let seed = 42;
+
+      function seededRandom() {
+        seed = (seed * 16807 + 0) % 2147483647;
+        return (seed - 1) / 2147483646;
+      }
+
+      function initAudio() {
+        if (audioCtx) return;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0.7;
+          masterGain.connect(audioCtx.destination);
+          sfxGain = audioCtx.createGain();
+          sfxGain.gain.value = 0.4;
+          sfxGain.connect(masterGain);
+          musicGain = audioCtx.createGain();
+          musicGain.gain.value = 0.35;
+          musicGain.connect(masterGain);
+        } catch(e) {
+          console.warn("音频初始化失败", e);
+        }
+      }
+
+      function stopMusic() {
+        if (pianoInterval) {
+          clearInterval(pianoInterval);
+          pianoInterval = null;
+        }
+        currentMusicNodes.forEach(node => {
+          try {
+            if (node.osc) node.osc.stop();
+            if (node.gain) node.gain.disconnect();
+          } catch(e) {}
+        });
+        currentMusicNodes = [];
+      }
+
+      function getPianoScale(level) {
+        const baseNotes = [
+          261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00,
+          415.30, 440.00, 466.16, 493.88, 523.25, 554.37, 587.33, 622.25,
+          659.25, 698.46, 739.99, 783.99, 830.61, 880.00, 932.33, 987.77
+        ];
+        const modeOffset = (level - 1) % 7;
+        const octaveShift = Math.floor((level - 1) / 7) % 3;
+        const modes = [
+          [0, 2, 4, 5, 7, 9, 11, 12],
+          [0, 2, 3, 5, 7, 9, 10, 12],
+          [0, 1, 3, 5, 7, 8, 10, 12],
+          [0, 2, 4, 6, 7, 9, 11, 12],
+          [0, 2, 4, 5, 7, 9, 10, 12],
+          [0, 2, 3, 5, 7, 8, 10, 12],
+          [0, 1, 3, 5, 6, 8, 10, 12]
+        ];
+        const mode = modes[modeOffset];
+        const scaleNotes = [];
+        for (let i = 0; i < 8; i++) {
+          let noteIndex = mode[i] + octaveShift * 12;
+          if (noteIndex < baseNotes.length) {
+            scaleNotes.push(baseNotes[noteIndex]);
+          }
+        }
+        return scaleNotes.length > 0 ? scaleNotes : [261.63, 293.66, 329.63, 349.23];
+      }
+
+      function playLevelMusic(level) {
+        if (!audioCtx || !musicGain) return;
+        stopMusic();
+        const notes = getPianoScale(level);
+        let noteIndex = 0;
+        let chordIndex = 0;
+
+        const playPianoNote = (freq, time, duration = 0.4, velocity = 0.2) => {
+          if (!audioCtx || !musicGain) return;
+          try {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, time);
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(freq * 2, time);
+            const osc3 = audioCtx.createOscillator();
+            osc3.type = 'sine';
+            osc3.frequency.setValueAtTime(freq * 3, time);
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(velocity, time);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+            const gain2 = audioCtx.createGain();
+            gain2.gain.setValueAtTime(velocity * 0.3, time);
+            gain2.gain.exponentialRampToValueAtTime(0.001, time + duration);
+            const gain3 = audioCtx.createGain();
+            gain3.gain.setValueAtTime(velocity * 0.1, time);
+            gain3.gain.exponentialRampToValueAtTime(0.001, time + duration);
+            osc.connect(gain);
+            osc2.connect(gain2);
+            osc3.connect(gain3);
+            gain.connect(musicGain);
+            gain2.connect(musicGain);
+            gain3.connect(musicGain);
+            osc.start(time);
+            osc2.start(time);
+            osc3.start(time);
+            osc.stop(time + duration);
+            osc2.stop(time + duration);
+            osc3.stop(time + duration);
+            currentMusicNodes.push({ osc, gain }, { osc: osc2, gain: gain2 }, { osc: osc3, gain: gain3 });
+          } catch(e) {}
+        };
+
+        const tempo = 400 - (level % 10) * 5;
+        pianoInterval = setInterval(() => {
+          if (!audioCtx || !musicGain) return;
+          const now = audioCtx.currentTime;
+          const melodyPattern = [0, 2, 4, 2, 0, 4, 2, 0, 1, 3, 5, 3];
+          const noteIdx = melodyPattern[noteIndex % melodyPattern.length];
+          playPianoNote(notes[Math.min(noteIdx, notes.length-1)], now, 0.5, 0.22);
+          if (noteIndex % 4 === 0) {
+            const chordRoot = notes[chordIndex % Math.min(4, notes.length)];
+            playPianoNote(chordRoot, now, 0.8, 0.15);
+            if (notes.length > 2) playPianoNote(notes[Math.min(chordIndex+2, notes.length-1)], now + 0.05, 0.8, 0.1);
+            if (notes.length > 4) playPianoNote(notes[Math.min(chordIndex+4, notes.length-1)], now + 0.1, 0.8, 0.08);
+            chordIndex++;
+          }
+          noteIndex++;
+        }, tempo);
+      }
+
+      function playSFX(type, level) {
+        if (!audioCtx || !sfxGain) return;
+        try {
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(sfxGain);
+          if (type === 'collect') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(660 + (level % 12) * 20, now);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+            osc.start(now);
+            osc.stop(now + 0.12);
+          } else if (type === 'hit') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150 - (level % 10), now);
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+            osc.start(now);
+            osc.stop(now + 0.22);
+          } else if (type === 'levelup') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(440 + (level % 12) * 10, now);
+            osc.frequency.linearRampToValueAtTime(880 + (level % 12) * 20, now + 0.15);
+            gain.gain.setValueAtTime(0.35, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            osc.start(now);
+            osc.stop(now + 0.3);
+          }
+        } catch(e) {}
+      }
+
+      function generateLevel(level) {
+        if (!canvasWidth || !canvasHeight) return;
+        const w = canvasWidth;
+        const h = canvasHeight;
+        const centerX = w/2;
+        const centerY = h/2;
+
+        targets = [];
+        obstacles = [];
+        particles = [];
+        ambientParticles = [];
+
+        player.radius = Math.min(w, h) * 0.045;
+        player.x = centerX;
+        player.y = centerY + h * 0.2;
+
+        seed = level * 7919 + 104729;
+        const targetCount = 2 + (level % 6);
+        const obstacleCount = 1 + (level % 4);
+        const angleStep = (Math.PI * 2) / targetCount;
+        const baseRadius = Math.min(w, h) * 0.3;
+
+        for (let i = 0; i < targetCount; i++) {
+          const angleOffset = seededRandom() * Math.PI;
+          const angle = angleStep * i + angleOffset;
+          const radiusVariation = baseRadius * (0.7 + seededRandom() * 0.6);
+          const tx = centerX + Math.cos(angle) * radiusVariation * (0.8 + seededRandom() * 0.4);
+          const ty = centerY - h * 0.1 + Math.sin(angle) * radiusVariation * (0.8 + seededRandom() * 0.4);
+          targets.push({
+            x: Math.max(player.radius, Math.min(w - player.radius, tx)),
+            y: Math.max(player.radius, Math.min(h - player.radius, ty)),
+            radius: player.radius * (0.7 + seededRandom() * 0.6),
+            collected: false
+          });
+        }
+
+        for (let i = 0; i < obstacleCount; i++) {
+          const angle = seededRandom() * Math.PI * 2;
+          const dist = Math.min(w, h) * 0.15 + seededRandom() * Math.min(w, h) * 0.3;
+          const ox = centerX + Math.cos(angle) * dist;
+          const oy = centerY + Math.sin(angle) * dist;
+          obstacles.push({
+            x: Math.max(player.radius*2, Math.min(w - player.radius*2, ox)),
+            y: Math.max(player.radius*2, Math.min(h - player.radius*2, oy)),
+            radius: player.radius * (0.8 + seededRandom() * 1.2)
+          });
+        }
+
+        levelTransition = 0;
+        gameCompleted = false;
+
+        const hueBase = (level * 37) % 360;
+        for (let i = 0; i < 50; i++) {
+          ambientParticles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: (Math.random() - 0.5) * 0.3,
+            size: Math.random() * 2 + 0.5,
+            alpha: Math.random() * 0.5 + 0.2,
+            color: `hsl(${hueBase + Math.random() * 30}, 70%, ${60 + Math.random() * 30}%)`
+          });
+        }
+      }
+
+      function checkLevelComplete() {
+        return targets.length > 0 && targets.every(t => t.collected);
+      }
+
+      function handleCollisions() {
+        if (!pointerActive || levelTransition > 0 || gameCompleted) return;
+        const px = player.x, py = player.y, pr = player.radius;
+        for (let t of targets) {
+          if (t.collected) continue;
+          if (Math.hypot(px - t.x, py - t.y) < pr + t.radius) {
+            t.collected = true;
+            playSFX('collect', currentLevel);
+            for (let i=0; i<15; i++) {
+              particles.push({
+                x: t.x, y: t.y,
+                vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5,
+                life: 1.0, maxLife: 1.0,
+                color: `hsl(${currentLevel*37%360}, 85%, 75%)`
+              });
+            }
+          }
+        }
+        for (let obs of obstacles) {
+          if (Math.hypot(px - obs.x, py - obs.y) < pr + obs.radius) {
+            playSFX('hit', currentLevel);
+            for (let i=0; i<10; i++) {
+              particles.push({
+                x: px, y: py,
+                vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4,
+                life: 0.6, maxLife: 0.6,
+                color: '#ff5566'
+              });
+            }
+            const angle = Math.atan2(py - obs.y, px - obs.x);
+            player.x = obs.x + Math.cos(angle) * (pr + obs.radius + 2);
+            player.y = obs.y + Math.sin(angle) * (pr + obs.radius + 2);
+            break;
+          }
+        }
+      }
+
+      function goToNextLevel() {
+        if (currentLevel < TOTAL_LEVELS) {
+          currentLevel++;
+          stopMusic();
+          if (audioCtx) playLevelMusic(currentLevel);
+          generateLevel(currentLevel);
+          playSFX('levelup', currentLevel);
+        } else {
+          gameCompleted = true;
+          stopMusic();
+          playSFX('levelup', 999);
+        }
+      }
+
+      function drawBackground(w, h, level) {
+        const hue = (level * 37) % 360;
+        const grad = ctx.createLinearGradient(0, 0, w*0.7, h);
+        grad.addColorStop(0, `hsl(${hue}, 60%, 12%)`);
+        grad.addColorStop(1, `hsl(${(hue+30)%360}, 70%, 6%)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 1;
+        for (let i=0; i<w; i+=45) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i + h*0.2, h);
+          ctx.stroke();
+        }
+      }
+
+      function updateParticles() {
+        for (let i=particles.length-1; i>=0; i--) {
+          let p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= 0.015;
+          if (p.life <= 0) particles.splice(i,1);
+        }
+        for (let p of ambientParticles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0 || p.x > canvasWidth) p.vx *= -1;
+          if (p.y < 0 || p.y > canvasHeight) p.vy *= -1;
+          p.alpha = 0.2 + Math.sin(Date.now() * 0.001 + p.x * 0.01) * 0.15;
+        }
+      }
+
+      function drawScene() {
+        if (!canvasWidth || !canvasHeight) return;
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        drawBackground(canvasWidth, canvasHeight, currentLevel);
+
+        // 氛围粒子
+        for (let p of ambientParticles) {
+          ctx.save();
+          ctx.globalAlpha = p.alpha;
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        if (levelTransition > 0) {
+          ctx.fillStyle = `rgba(255,255,255,${levelTransition*0.5})`;
+          ctx.fillRect(0,0,canvasWidth,canvasHeight);
+        }
+
+        // 障碍物
+        for (let obs of obstacles) {
+          ctx.save();
+          ctx.shadowColor = '#aa3355';
+          ctx.shadowBlur = 15;
+          ctx.fillStyle = '#cc4466';
+          ctx.beginPath();
+          ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI*2);
+          ctx.fill();
+          ctx.fillStyle = '#882233';
+          ctx.arc(obs.x, obs.y, obs.radius*0.6, 0, Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // 目标
+        const hue = (currentLevel * 37) % 360;
+        for (let t of targets) {
+          if (t.collected) continue;
+          ctx.save();
+          const pulse = Math.sin(Date.now()*0.01) * 0.1 + 0.9;
+          const r = t.radius * pulse;
+          for (let i=0; i<6; i++) {
+            const angle = (Date.now()*0.003 + i*Math.PI/3) % (Math.PI*2);
+            const px = t.x + Math.cos(angle) * r * 1.8;
+            const py = t.y + Math.sin(angle) * r * 1.8;
+            ctx.fillStyle = `hsla(${hue}, 80%, 75%, 0.8)`;
+            ctx.shadowColor = `hsl(${hue}, 80%, 75%)`;
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(px, py, r*0.15, 0, Math.PI*2);
+            ctx.fill();
+          }
+          ctx.shadowColor = '#ffdd88';
+          ctx.shadowBlur = 20;
+          ctx.fillStyle = '#ffe9b0';
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, r, 0, 2*Math.PI);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.arc(t.x, t.y, r*0.5, 0, 2*Math.PI);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // 玩家
+        ctx.save();
+        const time = Date.now() * 0.002;
+        for (let i=0; i<8; i++) {
+          const angle = (time + i * Math.PI/4) % (Math.PI*2);
+          const px = player.x + Math.cos(angle) * player.radius * 1.6;
+          const py = player.y + Math.sin(angle) * player.radius * 1.6;
+          const alpha = 0.4 + Math.sin(time*3 + i)*0.3;
+          ctx.fillStyle = `hsla(${hue}, 90%, 70%, ${alpha})`;
+          ctx.shadowColor = `hsl(${hue}, 90%, 70%)`;
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(px, py, player.radius*0.2, 0, Math.PI*2);
+          ctx.fill();
+        }
+        const glow = ctx.createRadialGradient(player.x, player.y, player.radius*0.2, player.x, player.y, player.radius*2.2);
+        glow.addColorStop(0, `hsla(${hue}, 90%, 75%, 0.9)`);
+        glow.addColorStop(0.5, `hsla(${hue}, 80%, 50%, 0.3)`);
+        glow.addColorStop(1, 'transparent');
+        ctx.fillStyle = glow;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius*2.2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowColor = `hsl(${hue}, 90%, 70%)`;
+        ctx.shadowBlur = 22;
+        ctx.fillStyle = `hsl(${hue}, 85%, 70%)`;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, 2*Math.PI);
+        ctx.fill();
+        ctx.restore();
+
+        // 粒子特效
+        for (let p of particles) {
+          ctx.globalAlpha = p.life / p.maxLife;
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2.5, 0, 2*Math.PI);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+
+        // UI文字
+        ctx.fillStyle = '#ffffffdd';
+        ctx.font = `bold ${Math.max(16, canvasWidth/30)}px "PingFang SC", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`第 ${currentLevel} / ${TOTAL_LEVELS} 关`, canvasWidth/2, canvasHeight*0.08);
+
+        if (gameCompleted) {
+          ctx.fillStyle = '#ffeebb';
+          ctx.font = `bold ${canvasWidth/12}px "PingFang SC"`;
+          ctx.fillText('✨ 永恒艺术之旅 ✨', canvasWidth/2, canvasHeight/2-20);
+          ctx.font = `${canvasWidth/20}px "PingFang SC"`;
+          ctx.fillText('你已完成全部999关!', canvasWidth/2, canvasHeight/2+50);
+        }
+      }
+
+      function gameLoop() {
+        updateParticles();
+        handleCollisions();
+
+        if (!gameCompleted && checkLevelComplete() && levelTransition === 0) {
+          levelTransition = 0.01;
+          transitionDirection = 1;
+        }
+        if (levelTransition > 0 && transitionDirection === 1) {
+          levelTransition += 0.025;
+          if (levelTransition >= 1.0) {
+            levelTransition = 0;
+            transitionDirection = 0;
+            goToNextLevel();
+          }
+        }
+
+        drawScene();
+        requestAnimationFrame(gameLoop);
+      }
+
+      function resizeCanvas() {
+        canvasWidth = window.innerWidth;
+        canvasHeight = window.innerHeight;
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        if (gameStarted) {
+          generateLevel(currentLevel);
+        } else {
+          generateLevel(1);
+          gameStarted = true;
+        }
+      }
+
+      function handlePointerMove(e) {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvasWidth / rect.width;
+        const scaleY = canvasHeight / rect.height;
+        let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        pointerX = (clientX - rect.left) * scaleX;
+        pointerY = (clientY - rect.top) * scaleY;
+        player.x = Math.min(Math.max(pointerX, player.radius), canvasWidth - player.radius);
+        player.y = Math.min(Math.max(pointerY, player.radius), canvasHeight - player.radius);
+      }
+
+      function handlePointerDown(e) {
+        e.preventDefault();
+        initAudio();
+        pointerActive = true;
+        handlePointerMove(e);
+        if (!gameStarted) {
+          resizeCanvas();
+          gameStarted = true;
+        }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        if (!currentMusicNodes.length && audioCtx) playLevelMusic(currentLevel);
+      }
+
+      function handlePointerUp(e) {
+        e.preventDefault();
+        pointerActive = false;
+      }
+
+      function toggleFullscreen() {
+        const el = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          (el.requestFullscreen || el.webkitRequestFullscreen).call(el).catch(()=>{});
+        } else {
+          (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        }
+      }
+
+      canvas.addEventListener('mousedown', handlePointerDown);
+      canvas.addEventListener('mousemove', e => { if(pointerActive) handlePointerMove(e); });
+      canvas.addEventListener('mouseup', handlePointerUp);
+      canvas.addEventListener('mouseleave', handlePointerUp);
+      canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+      canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+      canvas.addEventListener('touchend', handlePointerUp);
+      canvas.addEventListener('touchcancel', handlePointerUp);
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+      });
+      document.getElementById('fullscreenToggle').addEventListener('click', toggleFullscreen);
+      document.getElementById('fullscreenToggle').addEventListener('touchend', e => {
+        e.preventDefault();
+        toggleFullscreen();
+      });
+
+      // 初始设置 - 先设置画布大小再开始
+      resizeCanvas();
+      gameLoop();
+    })();
+  </script>
+</body>
+</html>

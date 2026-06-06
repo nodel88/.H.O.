@@ -2,8 +2,10 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>🏃 霓虹跑酷 · Neon Runner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>🏃 霓虹跑酷</title>
     <style>
         :root {
             --safe-top: env(safe-area-inset-top, 0px);
@@ -11,40 +13,38 @@
             --safe-left: env(safe-area-inset-left, 0px);
             --safe-right: env(safe-area-inset-right, 0px);
         }
-
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-        }
-
-        body {
-            width: 100vw;
-            height: 100vh;
-            height: 100dvh;
-            overflow: hidden;
-            background: #060b18;
-            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-            user-select: none;
-            -webkit-user-select: none;
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
             position: fixed;
             top: 0;
             left: 0;
+            touch-action: manipulation;
+            -webkit-overflow-scrolling: none;
         }
-
-        canvas {
+        #gameCanvas {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            display: block;
             z-index: 1;
+            display: block;
             touch-action: manipulation;
+            cursor: pointer;
         }
-
         .ui-layer {
             position: fixed;
             top: 0;
@@ -58,125 +58,121 @@
             padding-left: var(--safe-left);
             padding-right: var(--safe-right);
         }
-
         .ui-layer>* {
             pointer-events: auto;
         }
-
-        .top-bar {
+        .top-panel {
             position: absolute;
-            top: calc(12px + var(--safe-top));
+            top: calc(10px + var(--safe-top));
             left: 50%;
             transform: translateX(-50%);
             display: flex;
             align-items: center;
-            gap: 16px;
-            padding: 10px 20px;
-            background: rgba(12, 18, 36, 0.75);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 40px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            gap: 10px;
+            padding: 8px 16px;
+            background: rgba(10, 16, 34, 0.8);
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 6px 28px rgba(0, 0, 0, 0.7);
+            z-index: 20;
             white-space: nowrap;
         }
-
-        .score-item {
+        .score-block {
             display: flex;
             align-items: center;
-            gap: 6px;
-            font-size: 0.9rem;
+            gap: 4px;
+            font-size: 0.8rem;
             font-weight: 700;
             color: #fff;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
-        .score-item .label {
-            font-size: 0.65rem;
+        .score-block .s-label {
+            font-size: 0.6rem;
             text-transform: uppercase;
-            letter-spacing: 2px;
             color: #8899cc;
+            letter-spacing: 1.5px;
         }
-        .score-value {
-            font-size: 1.3rem;
+        .score-block .s-val {
+            font-size: 1.2rem;
             font-weight: 800;
             color: #ffd740;
-            text-shadow: 0 0 15px rgba(255, 215, 64, 0.6);
-            min-width: 40px;
+            text-shadow: 0 0 12px rgba(255, 215, 64, 0.7);
+            min-width: 32px;
             text-align: center;
         }
-        .high-score-value {
-            font-size: 0.8rem;
+        .score-block .s-best {
+            font-size: 0.7rem;
             color: #00e5ff;
-            text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+            text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
             font-weight: 700;
         }
-
-        .btn-group {
+        .btn-set {
             display: flex;
-            gap: 8px;
-            margin-left: 8px;
+            gap: 6px;
+            margin-left: 6px;
         }
-        .icon-btn {
-            width: 38px;
-            height: 38px;
+        .circle-btn {
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
-            border: 1.5px solid rgba(255, 255, 255, 0.2);
-            background: rgba(20, 28, 50, 0.6);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            border: 1.5px solid rgba(255, 255, 255, 0.22);
+            background: rgba(18, 26, 48, 0.7);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.25s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
             outline: none;
-            -webkit-tap-highlight-color: transparent;
             color: #fff;
-            font-size: 1.1rem;
+            font-size: 1rem;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+            z-index: 30;
         }
-        .icon-btn:active {
-            transform: scale(0.88);
+        .circle-btn:active {
+            transform: scale(0.85);
             border-color: #fff;
-            box-shadow: 0 0 24px rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.45);
         }
-        .icon-btn svg {
-            width: 18px;
-            height: 18px;
+        .circle-btn svg {
+            width: 16px;
+            height: 16px;
             fill: none;
             stroke: #ddd;
             stroke-width: 2.5;
             stroke-linecap: round;
             stroke-linejoin: round;
+            pointer-events: none;
         }
-
-        .hint-text {
+        .bottom-tip {
             position: absolute;
-            bottom: calc(30px + var(--safe-bottom));
+            bottom: calc(20px + var(--safe-bottom));
             left: 50%;
             transform: translateX(-50%);
             color: rgba(255, 255, 255, 0.4);
-            font-size: 0.7rem;
-            letter-spacing: 2px;
+            font-size: 0.65rem;
+            letter-spacing: 1.5px;
             text-align: center;
             white-space: nowrap;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
     <div class="ui-layer">
-        <div class="top-bar">
-            <div class="score-item">
-                <span class="label">得分</span>
-                <span class="score-value" id="scoreDisplay">0</span>
+        <div class="top-panel">
+            <div class="score-block">
+                <span class="s-label">得分</span>
+                <span class="s-val" id="scoreDisplay">0</span>
             </div>
-            <div class="score-item">
-                <span class="label">最高</span>
-                <span class="high-score-value" id="highScoreDisplay">0</span>
+            <div class="score-block">
+                <span class="s-label">最佳</span>
+                <span class="s-best" id="highScoreDisplay">0</span>
             </div>
-            <div class="btn-group">
-                <button class="icon-btn" id="btnFullscreen" title="全屏模式" aria-label="全屏切换">
+            <div class="btn-set">
+                <button class="circle-btn" id="btnFullscreen" title="全屏" aria-label="全屏切换">
                     <svg id="fullscreenIcon" viewBox="0 0 24 24">
                         <polyline points="8 3 3 3 3 8"></polyline>
                         <polyline points="16 3 21 3 21 8"></polyline>
@@ -184,16 +180,17 @@
                         <polyline points="3 16 3 21 8 21"></polyline>
                     </svg>
                 </button>
-                <button class="icon-btn" id="btnSound" title="音效开关">
-                    <span id="soundIcon">🔊</span>
+                <button class="circle-btn" id="btnSound" title="音效">
+                    <span id="soundIcon" style="font-size:0.9rem;">🔊</span>
                 </button>
             </div>
         </div>
-        <div class="hint-text">点击屏幕跳跃 · 支持二段跳</div>
+        <div class="bottom-tip">点击跳跃 · 支持二段跳</div>
     </div>
 
     <script>
         (function() {
+            // ==================== DOM ====================
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
             const scoreDisplay = document.getElementById('scoreDisplay');
@@ -203,8 +200,8 @@
             const soundIcon = document.getElementById('soundIcon');
             const fullscreenIcon = document.getElementById('fullscreenIcon');
 
+            // ==================== 画布尺寸 ====================
             let W, H;
-
             function resizeCanvas() {
                 W = window.innerWidth;
                 H = window.innerHeight;
@@ -213,11 +210,11 @@
             }
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
-            window.addEventListener('orientationchange', () => {
-                setTimeout(resizeCanvas, 100);
+            window.addEventListener('orientationchange', function() {
+                setTimeout(resizeCanvas, 150);
             });
 
-            // 音效引擎
+            // ==================== 音效 ====================
             let audioCtx = null;
             let soundEnabled = true;
             function initAudio() {
@@ -228,15 +225,18 @@
                         return;
                     }
                 }
-                if (audioCtx.state === 'suspended') audioCtx.resume();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(function() {});
+                }
             }
-            function playTone(freq, type, dur, vol = 0.06, glide = null) {
+            function playTone(freq, type, dur, vol, glide) {
                 if (!soundEnabled || !audioCtx) return;
+                vol = vol || 0.06;
                 try {
-                    const t = audioCtx.currentTime;
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.type = type;
+                    var t = audioCtx.currentTime;
+                    var osc = audioCtx.createOscillator();
+                    var gain = audioCtx.createGain();
+                    osc.type = type || 'sine';
                     osc.frequency.setValueAtTime(freq, t);
                     if (glide) osc.frequency.linearRampToValueAtTime(glide, t + dur);
                     gain.gain.setValueAtTime(vol, t);
@@ -257,16 +257,16 @@
             function sfxGameOver() { playTone(20, 'sawtooth', 0.3, 0.8, 10); }
             function updateSoundIcon() { soundIcon.textContent = soundEnabled ? '🔊' : '🔇'; }
 
-            // 游戏状态
-            let gameState = 'waiting';
-            let score = 0;
-            let highScore = 0;
-            let gameSpeed = 0;
-            const BASE_SPEED = 5.5;
-            let frameCount = 0;
-            let groundScroll = 0;
+            // ==================== 游戏状态 ====================
+            var gameState = 'waiting';
+            var score = 0;
+            var highScore = 0;
+            var gameSpeed = 0;
+            var BASE_SPEED = 5.5;
+            var frameCount = 0;
+            var groundScroll = 0;
 
-            const player = {
+            var player = {
                 x: 0,
                 y: 0,
                 w: 30,
@@ -279,9 +279,9 @@
                 glowPhase: 0,
                 invincible: 0,
             };
-            const GRAVITY = 0.75;
-            const JUMP_FORCE = -14;
-            const GROUND_Y_RATIO = 0.78;
+            var GRAVITY = 0.75;
+            var JUMP_FORCE = -14;
+            var GROUND_Y_RATIO = 0.78;
 
             function getGroundY() { return Math.floor(H * GROUND_Y_RATIO); }
             function initPlayer() {
@@ -295,66 +295,42 @@
                 player.glowPhase = 0;
             }
 
-            let obstacles = [];
-            const OBSTACLE_TYPES = ['spike', 'pillar', 'double'];
+            var obstacles = [];
+            var OBSTACLE_TYPES = ['spike', 'pillar', 'double'];
 
             function spawnObstacle() {
-                const groundY = getGroundY();
-                const type = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
-                let w, h;
-                switch (type) {
-                    case 'spike':
-                        w = 20 + Math.random() * 16;
-                        h = 30 + Math.random() * 35;
-                        break;
-                    case 'pillar':
-                        w = 24 + Math.random() * 18;
-                        h = 55 + Math.random() * 45;
-                        break;
-                    case 'double':
-                        w = 18 + Math.random() * 12;
-                        h = 24 + Math.random() * 18;
-                        break;
-                    default:
-                        w = 22;
-                        h = 38;
-                }
-                obstacles.push({
-                    x: W + 30,
-                    y: groundY - h,
-                    w,
-                    h,
-                    type,
-                    passed: false,
-                });
+                var groundY = getGroundY();
+                var type = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+                var w, h;
+                if (type === 'spike') { w = 20 + Math.random() * 16;
+                    h = 30 + Math.random() * 35; } else if (type === 'pillar') { w = 24 + Math.random() * 18;
+                    h = 55 + Math.random() * 45; } else { w = 18 + Math.random() * 12;
+                    h = 24 + Math.random() * 18; }
+                obstacles.push({ x: W + 30, y: groundY - h, w: w, h: h, type: type, passed: false });
             }
 
-            let coins = [];
+            var coins = [];
             function spawnCoin() {
-                const groundY = getGroundY();
-                const cy = groundY - 55 - Math.random() * 90;
-                coins.push({
-                    x: W + 40,
-                    y: Math.max(35, cy),
-                    r: 10,
-                    collected: false,
-                    pulsePhase: Math.random() * Math.PI * 2,
-                });
+                var groundY = getGroundY();
+                var cy = groundY - 55 - Math.random() * 90;
+                coins.push({ x: W + 40, y: Math.max(35, cy), r: 10, collected: false, pulsePhase: Math.random() * Math.PI *
+                        2 });
             }
 
-            let particles = [];
-            function spawnParticles(x, y, color, count = 14) {
-                for (let i = 0; i < count; i++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const speed = Math.random() * 7 + 2;
+            var particles = [];
+            function spawnParticles(x, y, color, count) {
+                count = count || 14;
+                for (var i = 0; i < count; i++) {
+                    var angle = Math.random() * Math.PI * 2;
+                    var speed = Math.random() * 7 + 2;
                     particles.push({
-                        x,
-                        y,
+                        x: x,
+                        y: y,
                         vx: Math.cos(angle) * speed,
                         vy: Math.sin(angle) * speed - Math.random() * 3,
                         life: 1,
                         decay: 0.018 + Math.random() * 0.04,
-                        color,
+                        color: color,
                         r: Math.random() * 3 + 1,
                     });
                 }
@@ -377,7 +353,7 @@
                 scoreDisplay.textContent = Math.floor(score);
                 if (score > highScore) {
                     highScore = Math.floor(score);
-                    try { localStorage.setItem('neonRunnerHighScoreV2', highScore); } catch (e) {}
+                    try { localStorage.setItem('neonRunnerHS', highScore); } catch (e) {}
                 }
                 highScoreDisplay.textContent = highScore;
             }
@@ -415,16 +391,21 @@
             function update() {
                 frameCount++;
                 if (gameState !== 'playing') {
-                    for (let p of particles) { p.x += p.vx;
+                    for (var i = particles.length - 1; i >= 0; i--) {
+                        var p = particles[i];
+                        p.x += p.vx;
                         p.y += p.vy;
                         p.life -= p.decay;
-                        p.vy += 0.03; }
-                    particles = particles.filter(p => p.life > 0);
+                        p.vy += 0.03;
+                        if (p.life <= 0) particles.splice(i, 1);
+                    }
                     player.glowPhase += 0.04;
                     player.trail.push({ x: player.x + player.w / 2, y: player.y + player.h / 2, life: 1 });
                     if (player.trail.length > 9) player.trail.shift();
-                    for (let t of player.trail) t.life -= 0.06;
-                    player.trail = player.trail.filter(t => t.life > 0);
+                    for (var j = player.trail.length - 1; j >= 0; j--) {
+                        player.trail[j].life -= 0.06;
+                        if (player.trail[j].life <= 0) player.trail.splice(j, 1);
+                    }
                     return;
                 }
 
@@ -433,7 +414,7 @@
                 score += gameSpeed * 0.16;
                 groundScroll = (groundScroll + gameSpeed) % 50;
 
-                const groundY = getGroundY();
+                var groundY = getGroundY();
                 player.vy += GRAVITY;
                 player.y += player.vy;
                 if (player.y + player.h >= groundY) {
@@ -447,35 +428,38 @@
 
                 player.trail.push({ x: player.x + player.w / 2, y: player.y + player.h / 2, life: 1 });
                 if (player.trail.length > 11) player.trail.shift();
-                for (let t of player.trail) t.life -= 0.05;
-                player.trail = player.trail.filter(t => t.life > 0);
+                for (var k = player.trail.length - 1; k >= 0; k--) {
+                    player.trail[k].life -= 0.05;
+                    if (player.trail[k].life <= 0) player.trail.splice(k, 1);
+                }
 
-                const spawnInterval = Math.max(35, 85 - Math.floor(score / 150) * 5);
+                var spawnInterval = Math.max(35, 85 - Math.floor(score / 150) * 5);
                 if (frameCount % spawnInterval === 0 && Math.random() < 0.7) spawnObstacle();
                 if (Math.random() < 0.02 && coins.length < 3) spawnCoin();
 
-                for (let ob of obstacles) {
+                for (var oi = obstacles.length - 1; oi >= 0; oi--) {
+                    var ob = obstacles[oi];
                     ob.x -= gameSpeed;
-                    if (!ob.passed && ob.x + ob.w < player.x) {
-                        ob.passed = true;
-                        score += 5;
-                    }
+                    if (!ob.passed && ob.x + ob.w < player.x) { ob.passed = true;
+                        score += 5; }
+                    if (ob.x < -100) obstacles.splice(oi, 1);
                 }
-                obstacles = obstacles.filter(ob => ob.x > -100);
 
-                for (let c of coins) {
+                for (var ci = coins.length - 1; ci >= 0; ci--) {
+                    var c = coins[ci];
                     c.x -= gameSpeed;
                     c.pulsePhase += 0.06;
+                    if (c.x < -50 && !c.collected) coins.splice(ci, 1);
                 }
-                coins = coins.filter(c => c.x > -50 && !c.collected);
 
                 if (player.invincible <= 0) {
-                    for (let ob of obstacles) {
-                        const px = player.x + 5;
-                        const py = player.y + 5;
-                        const pw = player.w - 10;
-                        const ph = player.h - 10;
-                        if (px < ob.x + ob.w && px + pw > ob.x && py < ob.y + ob.h && py + ph > ob.y) {
+                    for (var oi2 = obstacles.length - 1; oi2 >= 0; oi2--) {
+                        var ob2 = obstacles[oi2];
+                        var px = player.x + 5;
+                        var py = player.y + 5;
+                        var pw = player.w - 10;
+                        var ph = player.h - 10;
+                        if (px < ob2.x + ob2.w && px + pw > ob2.x && py < ob2.y + ob2.h && py + ph > ob2.y) {
                             sfxHit();
                             sfxGameOver();
                             spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#ff2d78', 45);
@@ -487,44 +471,48 @@
                     }
                 }
 
-                for (let c of coins) {
-                    if (c.collected) continue;
-                    const dx = (player.x + player.w / 2) - c.x;
-                    const dy = (player.y + player.h / 2) - c.y;
-                    if (Math.sqrt(dx * dx + dy * dy) < player.w / 2 + c.r) {
-                        c.collected = true;
+                for (var ci2 = coins.length - 1; ci2 >= 0; ci2--) {
+                    var c2 = coins[ci2];
+                    if (c2.collected) continue;
+                    var dx = (player.x + player.w / 2) - c2.x;
+                    var dy = (player.y + player.h / 2) - c2.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < player.w / 2 + c2.r) {
+                        c2.collected = true;
                         score += 30;
                         sfxCoin();
-                        spawnParticles(c.x, c.y, '#ffd740', 18);
+                        spawnParticles(c2.x, c2.y, '#ffd740', 18);
+                        coins.splice(ci2, 1);
                     }
                 }
-                coins = coins.filter(c => !c.collected || c.x > -50);
 
-                for (let p of particles) { p.x += p.vx;
-                    p.y += p.vy;
-                    p.life -= p.decay;
-                    p.vy += 0.03; }
-                particles = particles.filter(p => p.life > 0);
+                for (var pi = particles.length - 1; pi >= 0; pi--) {
+                    var pp = particles[pi];
+                    pp.x += pp.vx;
+                    pp.y += pp.vy;
+                    pp.life -= pp.decay;
+                    pp.vy += 0.03;
+                    if (pp.life <= 0) particles.splice(pi, 1);
+                }
 
                 updateScoreDisplay();
             }
 
             function draw() {
                 ctx.clearRect(0, 0, W, H);
-                const groundY = getGroundY();
+                var groundY = getGroundY();
 
-                const skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
+                var skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
                 skyGrad.addColorStop(0, '#04091a');
                 skyGrad.addColorStop(0.5, '#0b1430');
                 skyGrad.addColorStop(1, '#121e40');
                 ctx.fillStyle = skyGrad;
                 ctx.fillRect(0, 0, W, H);
 
-                for (let i = 0; i < 60; i++) {
-                    const sx = ((i * 173 + 41) % W);
-                    const sy = ((i * 251 + 13) % (groundY - 15)) + 8;
-                    const sr = ((i * 37) % 3) * 0.35 + 0.5;
-                    const twinkle = 0.4 + Math.sin(frameCount * 0.03 + i * 2.1) * 0.4;
+                for (var i = 0; i < 60; i++) {
+                    var sx = ((i * 173 + 41) % W);
+                    var sy = ((i * 251 + 13) % (groundY - 15)) + 8;
+                    var sr = ((i * 37) % 3) * 0.35 + 0.5;
+                    var twinkle = 0.4 + Math.sin(frameCount * 0.03 + i * 2.1) * 0.4;
                     ctx.globalAlpha = twinkle;
                     ctx.fillStyle = '#ffffff';
                     ctx.beginPath();
@@ -533,32 +521,31 @@
                 }
                 ctx.globalAlpha = 1;
 
-                const buildingsFar = [
-                    { x: 0, w: 60, h: 110 }, { x: 70, w: 40, h: 150 }, { x: 120, w: 65, h: 95 },
-                    { x: 195, w: 45, h: 170 }, { x: 250, w: 70, h: 120 }, { x: 330, w: 35, h: 140 },
-                    { x: 375, w: 55, h: 160 }, { x: 440, w: 50, h: 105 }, { x: 500, w: 65, h: 180 },
-                ];
+                var buildingsFar = [{ x: 0, w: 60, h: 110 }, { x: 70, w: 40, h: 150 }, { x: 120, w: 65, h: 95 }, { x: 195,
+                    w: 45, h: 170 }, { x: 250, w: 70, h: 120 }, { x: 330, w: 35, h: 140 }, { x: 375, w: 55, h: 160 },
+                { x: 440, w: 50, h: 105 }, { x: 500, w: 65, h: 180 }];
                 ctx.fillStyle = 'rgba(14,20,48,0.9)';
-                for (const b of buildingsFar) {
-                    const bx = (b.x - groundScroll * 0.3) % (W + 120) - 60;
+                for (var bf = 0; bf < buildingsFar.length; bf++) {
+                    var b = buildingsFar[bf];
+                    var bx = (b.x - groundScroll * 0.3) % (W + 120) - 60;
                     ctx.fillRect(bx, groundY - b.h, b.w, b.h);
                 }
 
-                const buildingsNear = [
-                    { x: 0, w: 80, h: 190 }, { x: 95, w: 55, h: 240 }, { x: 165, w: 70, h: 170 },
-                    { x: 250, w: 50, h: 260 }, { x: 315, w: 75, h: 200 }, { x: 405, w: 60, h: 230 },
-                ];
+                var buildingsNear = [{ x: 0, w: 80, h: 190 }, { x: 95, w: 55, h: 240 }, { x: 165, w: 70, h: 170 }, { x: 250,
+                    w: 50, h: 260 }, { x: 315, w: 75, h: 200 }, { x: 405, w: 60, h: 230 }];
                 ctx.fillStyle = 'rgba(8,12,32,0.95)';
-                for (const b of buildingsNear) {
-                    const bx = (b.x - groundScroll * 0.6) % (W + 140) - 70;
-                    ctx.fillRect(bx, groundY - b.h, b.w, b.h);
+                for (var bn = 0; bn < buildingsNear.length; bn++) {
+                    var bn2 = buildingsNear[bn];
+                    var bnx = (bn2.x - groundScroll * 0.6) % (W + 140) - 70;
+                    ctx.fillRect(bnx, groundY - bn2.h, bn2.w, bn2.h);
                 }
 
                 ctx.fillStyle = '#ffd740';
-                for (const b of buildingsNear) {
-                    const bx = (b.x - groundScroll * 0.6) % (W + 140) - 70;
-                    for (let wy = groundY - b.h + 18; wy < groundY - 25; wy += 28) {
-                        for (let wx = bx + 10; wx < bx + b.w - 12; wx += 20) {
+                for (var bnl = 0; bnl < buildingsNear.length; bnl++) {
+                    var bnl2 = buildingsNear[bnl];
+                    var bnlx = (bnl2.x - groundScroll * 0.6) % (W + 140) - 70;
+                    for (var wy = groundY - bnl2.h + 18; wy < groundY - 25; wy += 28) {
+                        for (var wx = bnlx + 10; wx < bnlx + bnl2.w - 12; wx += 20) {
                             if (Math.random() < 0.5) {
                                 ctx.globalAlpha = 0.45 + Math.random() * 0.55;
                                 ctx.fillRect(wx, wy, 8, 10);
@@ -568,7 +555,7 @@
                 }
                 ctx.globalAlpha = 1;
 
-                const groundGrad = ctx.createLinearGradient(0, groundY, 0, H);
+                var groundGrad = ctx.createLinearGradient(0, groundY, 0, H);
                 groundGrad.addColorStop(0, '#1a2850');
                 groundGrad.addColorStop(1, '#0a1030');
                 ctx.fillStyle = groundGrad;
@@ -585,15 +572,16 @@
                 ctx.shadowBlur = 0;
 
                 ctx.fillStyle = 'rgba(0,229,255,0.4)';
-                for (let i = 0; i < W / 35 + 2; i++) {
-                    const mx = (i * 35 - groundScroll % 35 + W) % W;
-                    if (mx < W) ctx.fillRect(mx, groundY + 4, 14, 3);
+                for (var gi = 0; gi < W / 35 + 2; gi++) {
+                    var gx = (gi * 35 - groundScroll % 35 + W) % W;
+                    if (gx < W) ctx.fillRect(gx, groundY + 4, 14, 3);
                 }
 
-                for (const c of coins) {
+                for (var ci = 0; ci < coins.length; ci++) {
+                    var c = coins[ci];
                     if (c.collected) continue;
-                    const glowR = c.r + 5 + Math.sin(c.pulsePhase) * 3;
-                    const glow = ctx.createRadialGradient(c.x, c.y, c.r * 0.3, c.x, c.y, glowR);
+                    var glowR = c.r + 5 + Math.sin(c.pulsePhase) * 3;
+                    var glow = ctx.createRadialGradient(c.x, c.y, c.r * 0.3, c.x, c.y, glowR);
                     glow.addColorStop(0, 'rgba(255,215,64,0.95)');
                     glow.addColorStop(0.5, 'rgba(255,180,40,0.4)');
                     glow.addColorStop(1, 'rgba(255,150,20,0)');
@@ -601,7 +589,7 @@
                     ctx.beginPath();
                     ctx.arc(c.x, c.y, glowR, 0, Math.PI * 2);
                     ctx.fill();
-                    const coinGrad = ctx.createRadialGradient(c.x - c.r * 0.2, c.y - c.r * 0.2, c.r * 0.1, c.x, c.y, c.r);
+                    var coinGrad = ctx.createRadialGradient(c.x - c.r * 0.2, c.y - c.r * 0.2, c.r * 0.1, c.x, c.y, c.r);
                     coinGrad.addColorStop(0, '#fffde0');
                     coinGrad.addColorStop(0.5, '#ffd740');
                     coinGrad.addColorStop(1, '#e6a800');
@@ -615,8 +603,9 @@
                     ctx.fill();
                 }
 
-                for (const ob of obstacles) {
-                    const grad = ctx.createLinearGradient(ob.x, ob.y, ob.x, ob.y + ob.h);
+                for (var oi = 0; oi < obstacles.length; oi++) {
+                    var ob = obstacles[oi];
+                    var grad = ctx.createLinearGradient(ob.x, ob.y, ob.x, ob.y + ob.h);
                     grad.addColorStop(0, '#ff3d60');
                     grad.addColorStop(0.5, '#e02040');
                     grad.addColorStop(1, '#6b0020');
@@ -632,14 +621,17 @@
                         ctx.fill();
                     } else if (ob.type === 'pillar') {
                         ctx.beginPath();
-                        ctx.roundRect(ob.x, ob.y, ob.w, ob.h, 6);
-                        ctx.fill();
+                        if (ctx.roundRect) { ctx.roundRect(ob.x, ob.y, ob.w, ob.h, 6);
+                            ctx.fill(); } else { ctx.fillRect(ob.x, ob.y, ob.w, ob.h); }
                     } else {
                         ctx.beginPath();
-                        ctx.roundRect(ob.x, ob.y, ob.w, ob.h, 4);
-                        ctx.fill();
+                        if (ctx.roundRect) { ctx.roundRect(ob.x, ob.y, ob.w, ob.h, 4);
+                            ctx.fill(); } else { ctx.fillRect(ob.x, ob.y, ob.w, ob.h); }
                         ctx.beginPath();
-                        ctx.roundRect(ob.x + ob.w + 4, ob.y + ob.h * 0.3, ob.w * 0.7, ob.h * 0.5, 3);
+                        var dw = ob.w * 0.7;
+                        var dh = ob.h * 0.5;
+                        if (ctx.roundRect) { ctx.roundRect(ob.x + ob.w + 4, ob.y + ob.h * 0.3, dw, dh, 3); } else { ctx
+                                .fillRect(ob.x + ob.w + 4, ob.y + ob.h * 0.3, dw, dh); }
                         ctx.fill();
                     }
                     ctx.shadowBlur = 0;
@@ -653,59 +645,52 @@
                         ctx.closePath();
                         ctx.stroke();
                     } else if (ob.type === 'pillar') {
-                        ctx.beginPath();
-                        ctx.roundRect(ob.x, ob.y, ob.w, ob.h, 6);
-                        ctx.stroke();
+                        ctx.strokeRect(ob.x, ob.y, ob.w, ob.h);
                     } else {
-                        ctx.beginPath();
-                        ctx.roundRect(ob.x, ob.y, ob.w, ob.h, 4);
-                        ctx.stroke();
+                        ctx.strokeRect(ob.x, ob.y, ob.w, ob.h);
                     }
                 }
 
-                for (let i = 0; i < player.trail.length; i++) {
-                    const t = player.trail[i];
-                    const alpha = t.life * 0.55;
-                    const r = 7 * t.life;
-                    ctx.fillStyle = `rgba(0,229,255,${alpha})`;
+                for (var ti = 0; ti < player.trail.length; ti++) {
+                    var t = player.trail[ti];
+                    var alpha = t.life * 0.55;
+                    var r = 7 * t.life;
+                    ctx.fillStyle = 'rgba(0,229,255,' + alpha + ')';
                     ctx.beginPath();
                     ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
                     ctx.fill();
                 }
 
                 if (player.invincible > 0 && player.invincible % 6 < 3) ctx.globalAlpha = 0.4;
-                const px = player.x,
+                var px = player.x,
                     py = player.y,
                     pw = player.w,
                     ph = player.h;
-                const playerGlow = ctx.createRadialGradient(px + pw / 2, py + ph / 2, pw * 0.3, px + pw / 2, py + ph / 2, pw *
+                var playerGlow = ctx.createRadialGradient(px + pw / 2, py + ph / 2, pw * 0.3, px + pw / 2, py + ph / 2, pw *
                     1.2);
                 playerGlow.addColorStop(0, 'rgba(0,229,255,0.8)');
                 playerGlow.addColorStop(0.5, 'rgba(0,180,255,0.3)');
                 playerGlow.addColorStop(1, 'rgba(0,100,200,0)');
                 ctx.fillStyle = playerGlow;
-                ctx.beginPath();
-                ctx.roundRect(px - 8, py - 8, pw + 16, ph + 16, 10);
-                ctx.fill();
-                const bodyGrad = ctx.createLinearGradient(px, py, px, py + ph);
+                ctx.fillRect(px - 8, py - 8, pw + 16, ph + 16);
+                var bodyGrad = ctx.createLinearGradient(px, py, px, py + ph);
                 bodyGrad.addColorStop(0, '#00e5ff');
                 bodyGrad.addColorStop(0.4, '#00b8d4');
                 bodyGrad.addColorStop(1, '#0050a0');
                 ctx.fillStyle = bodyGrad;
-                ctx.beginPath();
-                ctx.roundRect(px, py, pw, ph, 7);
-                ctx.fill();
+                ctx.fillRect(px, py, pw, ph);
                 ctx.fillStyle = 'rgba(255,255,255,0.8)';
                 ctx.fillRect(px + pw * 0.2, py + 5, pw * 0.35, ph * 0.22);
                 ctx.fillStyle = 'rgba(255,255,255,0.3)';
                 ctx.fillRect(px + pw * 0.55, py + ph * 0.3, pw * 0.2, ph * 0.15);
                 ctx.globalAlpha = 1;
 
-                for (const p of particles) {
-                    ctx.globalAlpha = p.life;
-                    ctx.fillStyle = p.color;
+                for (var pidx = 0; pidx < particles.length; pidx++) {
+                    var pt = particles[pidx];
+                    ctx.globalAlpha = pt.life;
+                    ctx.fillStyle = pt.color;
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+                    ctx.arc(pt.x, pt.y, pt.r * pt.life, 0, Math.PI * 2);
                     ctx.fill();
                 }
                 ctx.globalAlpha = 1;
@@ -714,26 +699,25 @@
                     ctx.fillStyle = 'rgba(0,0,0,0.6)';
                     ctx.fillRect(0, 0, W, H);
                     ctx.fillStyle = '#fff';
-                    ctx.font = `bold ${Math.floor(W*0.055)}px "PingFang SC","Microsoft YaHei",sans-serif`;
+                    ctx.font = 'bold ' + Math.floor(W * 0.055) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
                     ctx.textAlign = 'center';
                     ctx.fillText('点击屏幕开始奔跑', W / 2, H / 2 - 10);
                     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                    ctx.font = `${Math.floor(W*0.03)}px "PingFang SC","Microsoft YaHei",sans-serif`;
+                    ctx.font = Math.floor(W * 0.03) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
                     ctx.fillText('点击跳跃 · 支持二段跳', W / 2, H / 2 + 30);
                 }
-
                 if (gameState === 'gameover') {
                     ctx.fillStyle = 'rgba(0,0,0,0.75)';
                     ctx.fillRect(0, 0, W, H);
                     ctx.fillStyle = '#ff2d78';
-                    ctx.font = `bold ${Math.floor(W*0.065)}px "PingFang SC","Microsoft YaHei",sans-serif`;
+                    ctx.font = 'bold ' + Math.floor(W * 0.065) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
                     ctx.textAlign = 'center';
                     ctx.fillText('游戏结束', W / 2, H / 2 - 20);
                     ctx.fillStyle = '#fff';
-                    ctx.font = `${Math.floor(W*0.04)}px "PingFang SC","Microsoft YaHei",sans-serif`;
+                    ctx.font = Math.floor(W * 0.04) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
                     ctx.fillText('得分: ' + Math.floor(score), W / 2, H / 2 + 25);
                     ctx.fillStyle = '#ffd740';
-                    ctx.font = `${Math.floor(W*0.035)}px "PingFang SC","Microsoft YaHei",sans-serif`;
+                    ctx.font = Math.floor(W * 0.035) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
                     ctx.fillText('点击屏幕重新开始', W / 2, H / 2 + 55);
                 }
             }
@@ -744,31 +728,45 @@
                 requestAnimationFrame(gameLoop);
             }
 
-            canvas.addEventListener('click', e => { e.preventDefault();
-                jump(); });
-            canvas.addEventListener('touchstart', e => { e.preventDefault();
-                jump(); }, { passive: false });
-
-            window.addEventListener('keydown', e => {
-                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault();
-                    jump(); }
+            // ==================== 输入处理 ====================
+            canvas.addEventListener('pointerdown', function(e) {
+                e.preventDefault();
+                jump();
+            });
+            canvas.addEventListener('pointerup', function(e) {
+                e.preventDefault();
+            });
+            window.addEventListener('keydown', function(e) {
+                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+                    e.preventDefault();
+                    jump();
+                }
                 if (e.code === 'KeyF') { e.preventDefault();
                     toggleFullscreen(); }
                 if (e.code === 'KeyM') { e.preventDefault();
                     btnSound.click(); }
             });
 
-            function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+            // ==================== 全屏 ====================
+            function isFullscreen() {
+                return !!(document.fullscreenElement || document.webkitFullscreenElement);
+            }
 
             function requestFullscreen() {
-                const el = document.documentElement;
-                if (el.requestFullscreen) el.requestFullscreen();
-                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                var el = document.documentElement;
+                if (el.requestFullscreen) {
+                    el.requestFullscreen().catch(function() {});
+                } else if (el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                }
             }
 
             function exitFullscreen() {
-                if (document.exitFullscreen) document.exitFullscreen();
-                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().catch(function() {});
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
             }
 
             function toggleFullscreen() {
@@ -778,7 +776,7 @@
             }
 
             function updateFullscreenIconUI() {
-                const full = isFullscreen();
+                var full = isFullscreen();
                 if (full) {
                     fullscreenIcon.innerHTML =
                         '<polyline points="4 8 8 4 4 4 4 8"></polyline><polyline points="20 8 16 4 20 4 20 8"></polyline><polyline points="20 16 16 20 20 20 20 16"></polyline><polyline points="4 16 8 20 4 20 4 16"></polyline>';
@@ -788,26 +786,40 @@
                 }
             }
 
-            btnFullscreen.addEventListener('click', e => { e.stopPropagation();
-                toggleFullscreen(); });
-            document.addEventListener('fullscreenchange', () => { updateFullscreenIconUI();
-                setTimeout(resizeCanvas, 200); });
-            document.addEventListener('webkitfullscreenchange', () => { updateFullscreenIconUI();
-                setTimeout(resizeCanvas, 200); });
+            btnFullscreen.addEventListener('pointerdown', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                toggleFullscreen();
+            });
+            document.addEventListener('fullscreenchange', function() {
+                updateFullscreenIconUI();
+                setTimeout(resizeCanvas, 300);
+            });
+            document.addEventListener('webkitfullscreenchange', function() {
+                updateFullscreenIconUI();
+                setTimeout(resizeCanvas, 300);
+            });
             updateFullscreenIconUI();
 
-            btnSound.addEventListener('click', e => {
+            // 音效按钮
+            btnSound.addEventListener('pointerdown', function(e) {
                 e.stopPropagation();
+                e.preventDefault();
                 initAudio();
                 soundEnabled = !soundEnabled;
                 updateSoundIcon();
-                if (soundEnabled && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                if (soundEnabled && audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(function() {});
+                }
             });
 
+            // ==================== 初始化 ====================
             function init() {
                 resizeCanvas();
-                try { const saved = localStorage.getItem('neonRunnerHighScoreV2'); if (saved) highScore = parseInt(
-                        saved) || 0; } catch (e) { highScore = 0; }
+                try {
+                    var saved = localStorage.getItem('neonRunnerHS');
+                    if (saved) highScore = parseInt(saved) || 0;
+                } catch (e) { highScore = 0; }
                 resetGame();
                 updateScoreDisplay();
                 updateSoundIcon();
@@ -815,8 +827,6 @@
             }
             init();
             gameLoop();
-
-            console.log('🏃 霓虹跑酷 · 全屏自适应已就绪');
         })();
     </script>
 </body>

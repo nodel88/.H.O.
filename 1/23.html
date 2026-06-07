@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Hardopera">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2b004d">
+    <title>Hardopera</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            background: #2b004d;
+            overflow: hidden;
+            touch-action: none;
+        }
+        body {
+            font-family: 'Oxanium', sans-serif;
+            color: #ccc;
+        }
+        #app {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(128, 0, 255, 0.08);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(128, 0, 255, 0.35);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(128, 0, 255, 0.5);
+        }
+
+        .top-bar {
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: none;
+        }
+        .game-name {
+            color: #cccccc;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        .top-level {
+            color: #cccccc;
+            font-size: 11px;
+            line-height: 1;
+        }
+        .meteor-dots {
+            display: flex;
+            gap: 2px;
+            flex-wrap: nowrap;
+            max-width: 50vw;
+            overflow: hidden;
+        }
+        .dot {
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background: #333333;
+        }
+        .dot.done {
+            background: #dddddd;
+        }
+
+        .nav-bar {
+            position: fixed;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 200;
+        }
+        .nav-item {
+            width: 42px;
+            height: 42px;
+            border: none;
+            background: transparent;
+            color: #cccccc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .nav-item.active {
+            color: #0ff;
+            background: rgba(0, 255, 255, 0.12);
+        }
+        .nav-item:hover {
+            color: #fff;
+        }
+
+        .panel {
+            position: fixed;
+            bottom: 62px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92vw;
+            max-width: 600px;
+            max-height: 60vh;
+            background: rgba(25, 25, 40, 0.75);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(128, 0, 255, 0.25);
+            border-radius: 12px;
+            padding: 18px;
+            color: #e6e6e6;
+            overflow-y: auto;
+            display: none;
+            z-index: 300;
+        }
+        .panel.show {
+            display: block;
+        }
+        .panel h3 {
+            color: #c084fc;
+            text-align: center;
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+
+        .view-switch {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .view-btn {
+            padding: 4px 10px;
+            border: 1px solid rgba(128, 0, 255, 0.3);
+            background: transparent;
+            color: #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .view-btn.active {
+            background: rgba(128, 0, 255, 0.2);
+            color: #c084fc;
+        }
+
+        .gem-list {
+            display: grid;
+            gap: 10px;
+        }
+        .gem-col-2 { grid-template-columns: repeat(2, 1fr); }
+        .gem-col-5 { grid-template-columns: repeat(5, 1fr); }
+        .gem-col-8 { grid-template-columns: repeat(8, 1fr); }
+        .gem-item {
+            aspect-ratio: 1;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .gem-item canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .color-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+        .color-item {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .color-item.selected {
+            border-color: #c084fc;
+            box-shadow: 0 0 8px rgba(128, 0, 255, 0.4);
+            transform: scale(1.05);
+        }
+
+        .level-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+            gap: 8px;
+        }
+        .level-item {
+            padding: 8px 4px;
+            text-align: center;
+            border-radius: 6px;
+            font-size: 14px;
+            border: 1px solid transparent;
+            transition: 0.2s;
+        }
+        .level-pass {
+            background: rgba(0, 180, 80, 0.25);
+            color: #89ffb8;
+            border-color: rgba(0, 220, 100, 0.3);
+        }
+        .level-lock {
+            background: rgba(60, 60, 80, 0.3);
+            color: #999;
+        }
+        .level-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .vol-row {
+            margin: 14px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .vol-row label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #ccc;
+            flex: 0 0 70px;
+        }
+        .vol-slider-wrap {
+            flex: 1;
+        }
+        .mute-icon {
+            width: 42px;
+            height: 42px;
+            border: none;
+            background: transparent;
+            color: #cccccc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .mute-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .mute-icon.active {
+            color: #ff6666;
+            background: rgba(255, 102, 102, 0.12);
+        }
+        .mute-icon:hover {
+            color: #fff;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #c084fc;
+            cursor: pointer;
+        }
+
+        .rank-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 14px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 16px 0;
+        }
+        .log-btn {
+            padding: 6px 16px;
+            border: 1px solid rgba(128, 0, 255, 0.3);
+            background: transparent;
+            color: #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .log-btn:hover {
+            color: #c084fc;
+            border-color: #c084fc;
+        }
+        .log-content {
+            margin-top: 12px;
+            padding: 12px;
+            border: 1px solid rgba(128, 0, 255, 0.2);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.7;
+            display: none;
+        }
+        .log-content.show {
+            display: block;
+        }
+
+        .gem-preview {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .gem-preview.show {
+            display: flex;
+        }
+        .preview-canvas {
+            width: 70vmin;
+            height: 70vmin;
+            margin-bottom: 30px;
+        }
+        .save-btn {
+            padding: 10px 24px;
+            background: rgba(128, 0, 255, 0.2);
+            border: 1px solid #c084fc;
+            color: #c084fc;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        .start-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 400px;
+            background: rgba(25, 25, 40, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(128, 0, 255, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            z-index: 9999;
+            display: none;
+            text-align: center;
+        }
+        .start-modal h2 {
+            color: #c084fc;
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+        .start-tip {
+            color: #ccc;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+        .modal-btn {
+            min-width: 120px;
+            padding: 10px 0;
+            margin: 6px;
+            border: 1px solid #c084fc;
+            background: rgba(128, 0, 255, 0.1);
+            color: #c084fc;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .modal-btn:hover {
+            background: rgba(128, 0, 255, 0.25);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="top-bar">
+            <div class="game-name">Hardopera</div>
+            <div class="meteor-dots" id="dotContainer"></div>
+            <div class="top-level" id="topLevel">1</div>
+        </div>
+
+        <div class="nav-bar">
+            <button class="nav-item" data-panel="colorPanel">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+            </button>
+            <button class="nav-item" data-panel="levelPanel">
+                <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            </button>
+            <button class="nav-item" data-panel="treasurePanel">
+                <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </button>
+            <button class="nav-item" data-panel="volPanel">
+                <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            </button>
+            <button class="nav-item" data-panel="rankPanel">
+                <svg viewBox="0 0 24 24"><line x1="7" y1="20" x2="7" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="14"/></svg>
+            </button>
+            <button class="nav-item" id="fullscreenBtn">
+                <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+            <button class="nav-item" data-panel="infoPanel">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </button>
+        </div>
+
+        <div class="panel" id="colorPanel"><h3>皮肤</h3><div class="color-list" id="colorList"></div></div>
+        <div class="panel" id="levelPanel"><h3>关卡</h3><div class="level-list" id="levelList"></div></div>
+        <div class="panel" id="treasurePanel">
+            <h3>宝库</h3>
+            <div class="view-switch">
+                <button class="view-btn active" data-col="2">两列</button>
+                <button class="view-btn" data-col="5">五列</button>
+                <button class="view-btn" data-col="8">八列</button>
+            </div>
+            <div class="gem-list gem-col-2" id="gemList"></div>
+        </div>
+        <div class="panel" id="volPanel">
+            <h3>音量</h3>
+            <div class="vol-row">
+                <label>背景音乐</label>
+                <div class="vol-slider-wrap">
+                    <input type="range" id="bgmVol" min="0" max="100" value="60">
+                </div>
+                <button class="mute-icon" id="bgmMute">
+                    <svg class="icon-vol" viewBox="0 0 24 24">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                    </svg>
+                    <svg class="icon-mute" style="display:none;" viewBox="0 0 24 24">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <line x1="19" y1="9" x2="13" y2="15"></line>
+                        <line x1="13" y1="9" x2="19" y2="15"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="vol-row">
+                <label>游戏音效</label>
+                <div class="vol-slider-wrap">
+                    <input type="range" id="sfxVol" min="0" max="100" value="60">
+                </div>
+                <button class="mute-icon" id="sfxMute">
+                    <svg class="icon-vol" viewBox="0 0 24 24">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                    </svg>
+                    <svg class="icon-mute" style="display:none;" viewBox="0 0 24 24">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <line x1="19" y1="9" x2="13" y2="15"></line>
+                        <line x1="13" y1="9" x2="19" y2="15"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="panel" id="rankPanel">
+            <h3>排行</h3>
+            <div id="rankList"></div>
+        </div>
+        <div class="panel" id="infoPanel">
+            <h3>简介</h3>
+            <p style="line-height:1.6;">点击屏幕发射粒子击碎陨石闯关，支持多点触控，全屏可双击画面切换。</p>
+            <div class="btn-group">
+                <button class="log-btn" id="logBtn">日志/书签</button>
+            </div>
+            <div class="log-content" id="logContent">
+                <strong>当前版本：V1.4.0</strong><br>
+                更新：每一关固定分配不同背景音乐，相邻关卡绝不重复
+            </div>
+        </div>
+
+        <div class="gem-preview" id="gemPreview">
+            <canvas class="preview-canvas" id="previewCanvas"></canvas>
+            <button class="save-btn" id="saveGemBtn">保存宝石图片</button>
+        </div>
+
+        <div class="start-modal" id="startModal">
+            <h2>Hardopera</h2>
+            <p class="start-tip" id="startTip"></p>
+            <button class="modal-btn" id="continueBtn">继续上次进度</button>
+            <button class="modal-btn" id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        // 禁用右键、拖拽、长按菜单
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('dragstart', e => e.preventDefault());
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const topLevel = document.getElementById('topLevel');
+        const dotContainer = document.getElementById('dotContainer');
+        const colorList = document.getElementById('colorList');
+        const levelList = document.getElementById('levelList');
+        const gemList = document.getElementById('gemList');
+        const bgmVol = document.getElementById('bgmVol');
+        const sfxVol = document.getElementById('sfxVol');
+        const bgmMute = document.getElementById('bgmMute');
+        const sfxMute = document.getElementById('sfxMute');
+        const navItems = document.querySelectorAll('.nav-item');
+        const panels = document.querySelectorAll('.panel');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const viewBtns = document.querySelectorAll('.view-btn');
+        const gemPreview = document.getElementById('gemPreview');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const preCtx = previewCanvas.getContext('2d');
+        const saveGemBtn = document.getElementById('saveGemBtn');
+        const rankList = document.getElementById('rankList');
+        const logBtn = document.getElementById('logBtn');
+        const logContent = document.getElementById('logContent');
+        const startModal = document.getElementById('startModal');
+        const startTip = document.getElementById('startTip');
+        const continueBtn = document.getElementById('continueBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        const MAX_LEVEL = 999;
+        const GAME_NAME = "Hardopera";
+        let currentLevel = 1, maxUnlockedLevel = 1;
+        let gameStart = false, isLevelPass = false;
+        let particles = [], targets = [], lootArr = [];
+        let bgmMuted = false, sfxMuted = false;
+        let currentViewCol = 2, previewGemData = null;
+        const previewRotateTime = 3000;
+        let audioCtx = null, bgmTimer = null, bgmGain, sfxGain;
+
+        // ========== 10首完全不同的欢快钢琴曲/电子旋律（核心修复） ==========
+        const BGM_LIST = [
+            [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 392.00, 349.23],
+            [293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 440.00, 392.00],
+            [329.63, 293.66, 261.63, 293.66, 329.63, 349.23, 392.00, 349.23],
+            [220.00, 261.63, 293.66, 329.63, 293.66, 261.63, 220.00, 246.94],
+            [349.23, 392.00, 440.00, 392.00, 349.23, 329.63, 293.66, 261.63],
+            [246.94, 293.66, 329.63, 349.23, 329.63, 293.66, 261.63, 246.94],
+            [392.00, 440.00, 493.88, 440.00, 392.00, 349.23, 329.63, 293.66],
+            [261.63, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66, 261.63],
+            [293.66, 349.23, 392.00, 440.00, 493.88, 440.00, 392.00, 349.23],
+            [220.00, 246.94, 261.63, 293.66, 329.63, 293.66, 261.63, 246.94]
+        ];
+
+        const colorThemes = [
+            {main:'#ff00ff',sub:'#00ffff',name:'霓虹青粉'},
+            {main:'#ffff00',sub:'#ff8800',name:'暖黄橙光'},
+            {main:'#00ff88',sub:'#00aaff',name:'清新蓝绿'},
+            {main:'#ff4444',sub:'#ffaa00',name:'烈焰橙红'},
+            {main:'#aa44ff',sub:'#44ffaa',name:'梦幻紫绿'},
+            {main:'#ffffff',sub:'#8888ff',name:'冷白浅蓝'},
+            {main:'#ff6699',sub:'#66ccff',name:'蜜桃浅蓝'},
+            {main:'#99ff66',sub:'#ff66cc',name:'草绿玫红'},
+            {main:'#ffcc00',sub:'#00ccff',name:'鎏金浅青'},
+            {main:'#cc66ff',sub:'#ffcc66',name:'柔紫暖黄'},
+            {main:'#33ffcc',sub:'#ff9966',name:'薄荷暖橙'},
+            {main:'#ff3366',sub:'#33ccff',name:'绯红冰蓝'}
+        ];
+        let currentTheme = 0;
+
+        const STORAGE_KEY_PROGRESS = 'game_progress_data';
+        const STORAGE_KEY_RANK = 'game_rank_data';
+        const STORAGE_KEY_FIRST_RUN = 'game_first_run';
+
+        // 切换音量图标
+        function toggleMuteIcon(btn, isMute) {
+            const volIcon = btn.querySelector('.icon-vol');
+            const muteIcon = btn.querySelector('.icon-mute');
+            volIcon.style.display = isMute ? 'none' : 'block';
+            muteIcon.style.display = isMute ? 'block' : 'none';
+        }
+
+        function loadProgress() {
+            const data = localStorage.getItem(STORAGE_KEY_PROGRESS);
+            if(data) {
+                const obj = JSON.parse(data);
+                currentLevel = obj.currentLevel || 1;
+                maxUnlockedLevel = obj.maxUnlockedLevel || 1;
+                return true;
+            }
+            return false;
+        }
+        function saveProgress() {
+            localStorage.setItem(STORAGE_KEY_PROGRESS, JSON.stringify({
+                currentLevel,
+                maxUnlockedLevel
+            }));
+        }
+        function initRankData() {
+            let rank = localStorage.getItem(STORAGE_KEY_RANK);
+            if(!rank) {
+                const defaultRank = [
+                    {name:"挑战者", level:128},
+                    {name:"星光旅人", level:96},
+                    {name:"粒子大师", level:72},
+                    {name:"新手玩家", level:24},
+                    {name:"初始玩家", level:8}
+                ];
+                localStorage.setItem(STORAGE_KEY_RANK, JSON.stringify(defaultRank));
+                rank = defaultRank;
+            } else {
+                rank = JSON.parse(rank);
+            }
+            renderRank(rank);
+        }
+        function renderRank(list) {
+            rankList.innerHTML = '';
+            list.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = 'rank-item';
+                div.innerHTML = `${idx+1}. ${item.name} - 通关 ${item.level} 关`;
+                rankList.appendChild(div);
+            });
+        }
+
+        function getRandomMeteorStyle(){
+            const sides = Math.floor(Math.random() * 5) + 5;
+            const r1 = Math.floor(Math.random()*256), g1 = Math.floor(Math.random()*256), b1 = Math.floor(Math.random()*256);
+            const r2 = Math.floor(Math.random()*256), g2 = Math.floor(Math.random()*256), b2 = Math.floor(Math.random()*256);
+            return {sides, c1:`rgb(${r1},${g1},${b1})`, c2:`rgb(${r2},${g2},${b2})`};
+        }
+
+        function drawMeteor(ctx, x, y, radius, style, rotate = 0){
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotate);
+            ctx.beginPath();
+            const side = style.sides;
+            for(let i = 0; i < side; i++){
+                const angle = (Math.PI * 2 / side) * i;
+                const currR = radius * (0.7 + Math.sin(rotate + i) * 0.3);
+                const px = Math.cos(angle) * currR;
+                const py = Math.sin(angle) * currR;
+                i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            const grad = ctx.createRadialGradient(0,0,0,0,0,radius);
+            grad.addColorStop(0, style.c1);
+            grad.addColorStop(1, style.c2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function resizeCanvas(){
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            previewCanvas.width = 400;
+            previewCanvas.height = 400;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function toggleFullScreen(){
+            const docEl = document.documentElement;
+            const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement ||
+                             document.mozFullScreenElement || document.msFullscreenElement);
+            if (isFull) {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+                else if (document.msExitFullscreen) document.msExitFullscreen();
+            } else {
+                if (docEl.requestFullscreen) docEl.requestFullscreen();
+                else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+                else if (docEl.mozRequestFullScreen) docEl.mozRequestFullscreen();
+                else if (docEl.msRequestFullscreen) docEl.msRequestFullscreen();
+            }
+        }
+        fullscreenBtn.addEventListener('click', toggleFullScreen);
+        canvas.addEventListener('dblclick', e => e.preventDefault());
+
+        logBtn.addEventListener('click', ()=>{
+            logContent.classList.toggle('show');
+        });
+
+        function updateTopLevel(lv){ topLevel.innerText = lv; }
+
+        viewBtns.forEach(btn=>{
+            btn.addEventListener('click',()=>{
+                viewBtns.forEach(b=>b.classList.remove('active'));
+                btn.classList.add('active');
+                currentViewCol = +btn.dataset.col;
+                gemList.className = `gem-list gem-col-${currentViewCol}`;
+            });
+        });
+
+        function renderGemList(){
+            gemList.innerHTML = '';
+            lootArr.forEach(style=>{
+                const item = document.createElement('div');
+                item.className = 'gem-item';
+                const c = document.createElement('canvas');
+                c.width = 100; c.height = 100;
+                const gctx = c.getContext('2d');
+                drawMeteor(gctx, 50, 50, 42, style, 0);
+                item.appendChild(c);
+                item.dataset.gem = JSON.stringify(style);
+                item.addEventListener('click',()=>openGemPreview(style));
+                gemList.appendChild(item);
+            });
+        }
+
+        function openGemPreview(style){
+            previewGemData = style;
+            gemPreview.classList.add('show');
+            const start = Date.now();
+            function rotate(){
+                const dur = Date.now() - start;
+                const rot = (dur / previewRotateTime) * Math.PI * 2;
+                preCtx.clearRect(0,0,400,400);
+                drawMeteor(preCtx, 200, 200, 130, style, rot);
+                if(dur < previewRotateTime) requestAnimationFrame(rotate);
+            }
+            rotate();
+        }
+        gemPreview.addEventListener('click',e=>{
+            if(e.target === gemPreview) gemPreview.classList.remove('show');
+        });
+
+        saveGemBtn.addEventListener('click',()=>{
+            if(!previewGemData) return;
+            const temp = document.createElement('canvas');
+            const tctx = temp.getContext('2d');
+            const W = 480, H = 640;
+            temp.width = W; temp.height = H;
+            tctx.fillStyle = '#2b004d';
+            tctx.fillRect(0,0,W,H);
+            tctx.fillStyle = '#fff';
+            tctx.font = "bold 22px 'Oxanium', sans-serif";
+            tctx.textAlign = "center";
+            tctx.fillText(GAME_NAME, W/2, 60);
+            drawMeteor(tctx, W/2, H/2-40, 145, previewGemData, 0);
+            tctx.font = "18px 'Oxanium', sans-serif";
+            tctx.fillText("Hardopera Game", W/2, H-40);
+            const a = document.createElement('a');
+            a.download = "Meteor_"+Date.now()+".png";
+            a.href = temp.toDataURL("image/png");
+            a.click();
+        });
+
+        navItems.forEach(item=>{
+            item.addEventListener('click',()=>{
+                const p = document.getElementById(item.dataset.panel);
+                panels.forEach(x=>x.classList.remove('show'));
+                navItems.forEach(x=>x.classList.remove('active'));
+                if(p) p.classList.toggle('show');
+                item.classList.toggle('active');
+            });
+        });
+        document.addEventListener('click',e=>{
+            if(!e.target.closest('.nav-bar') && !e.target.closest('.panel')){
+                panels.forEach(x=>x.classList.remove('show'));
+                navItems.forEach(x=>x.classList.remove('active'));
+            }
+        });
+
+        function initColorPanel(){
+            colorList.innerHTML = '';
+            colorThemes.forEach((t,i)=>{
+                const div = document.createElement('div');
+                div.className = 'color-item' + (i===currentTheme?' selected':'');
+                div.style.background = `linear-gradient(45deg,${t.main},${t.sub})`;
+                div.title = t.name;
+                div.onclick = ()=>{
+                    currentTheme = i;
+                    initColorPanel();
+                };
+                colorList.appendChild(div);
+            });
+        }
+
+        function renderLevelList(){
+            levelList.innerHTML = '';
+            for(let i=1;i<=MAX_LEVEL;i++){
+                const div = document.createElement('div');
+                div.className = 'level-item ' + (i<=maxUnlockedLevel?'level-pass':'level-lock');
+                div.innerText = i;
+                if(i<=maxUnlockedLevel){
+                    div.onclick = ()=>{
+                        if(gameStart){
+                            currentLevel = i;
+                            createLevel(currentLevel);
+                            saveProgress();
+                            panels.forEach(p=>p.classList.remove('show'));
+                        }
+                    };
+                }
+                levelList.appendChild(div);
+            }
+        }
+
+        function renderDots(total, done){
+            dotContainer.innerHTML = '';
+            for(let i=0;i<total;i++){
+                const d = document.createElement('div');
+                d.className = 'dot' + (i<done?' done':'');
+                dotContainer.appendChild(d);
+            }
+        }
+
+        function addLoot(style){ lootArr.push(style); renderGemList(); }
+
+        function initAudio(){
+            if(audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            bgmGain = audioCtx.createGain();
+            sfxGain = audioCtx.createGain();
+            bgmGain.gain.value = bgmVol.value/100;
+            sfxGain.gain.value = sfxVol.value/100;
+            bgmGain.connect(audioCtx.destination);
+            sfxGain.connect(audioCtx.destination);
+        }
+        function setVolume(){
+            if(!audioCtx) return;
+            bgmGain.gain.value = bgmMuted ? 0 : bgmVol.value/100;
+            sfxGain.gain.value = sfxMuted ? 0 : sfxVol.value/100;
+        }
+        bgmVol.addEventListener('input', setVolume);
+        sfxVol.addEventListener('input', setVolume);
+
+        // 核心逻辑：根据当前关卡序号分配BGM，每一关音乐不同
+        function playLevelBGM(level) {
+            if (bgmMuted || !audioCtx) return;
+            stopBGM();
+            // 用关卡序号对曲目总数取模，循环分配，每一关固定对应一首
+            const idx = (level - 1) % BGM_LIST.length;
+            const mel = BGM_LIST[idx];
+            const beat = 0.18;
+
+            function loop() {
+                if (!gameStart || isLevelPass || bgmMuted) return;
+                mel.forEach((f, i) => playPianoNote(f, i * beat, 0.65));
+                bgmTimer = setTimeout(loop, mel.length * beat * 1000);
+            }
+            loop();
+        }
+
+        bgmMute.addEventListener('click',()=>{
+            bgmMuted = !bgmMuted;
+            bgmMute.classList.toggle('active', bgmMuted);
+            toggleMuteIcon(bgmMute, bgmMuted);
+            setVolume();
+        });
+        sfxMute.addEventListener('click',()=>{
+            sfxMuted = !sfxMuted;
+            sfxMute.classList.toggle('active', sfxMuted);
+            toggleMuteIcon(sfxMute, sfxMuted);
+            setVolume();
+        });
+
+        function playPianoNote(freq, time=0, dur=1.2){
+            if(sfxMuted || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(sfxGain);
+            osc.type = 'sine'; osc.frequency.value = freq;
+            const now = audioCtx.currentTime + time;
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.35, now+0.005);
+            gain.gain.linearRampToValueAtTime(0.001, now+dur);
+            osc.start(now); osc.stop(now+dur+0.05);
+        }
+        function stopBGM(){ if(bgmTimer) clearTimeout(bgmTimer); bgmTimer = null; }
+        function playHitSfx(lv){ playPianoNote(523 + lv*30, 0, 0.35); }
+
+        class Particle{
+            constructor(x,y){
+                this.x = x; this.y = y;
+                const ang = Math.random()*Math.PI*2;
+                const spd = 2 + Math.random()*4;
+                this.vx = Math.cos(ang)*spd;
+                this.vy = Math.sin(ang)*spd;
+                this.r = 2 + Math.random()*4;
+                this.life = 100;
+                const t = colorThemes[currentTheme];
+                this.color = Math.random()>0.5 ? t.main : t.sub;
+            }
+            update(){
+                this.x += this.vx; this.y += this.vy;
+                this.vy += 0.02;
+                this.life--;
+                return this.life > 0;
+            }
+            draw(){
+                ctx.beginPath();
+                ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = this.color;
+                ctx.fill();
+            }
+        }
+
+        class Meteor{
+            constructor(x,y){
+                this.x = x; this.y = y;
+                this.r = 24;
+                this.active = true;
+                this.ang = 0;
+                this.style = getRandomMeteorStyle();
+                this.data = this.style;
+            }
+            update(){ this.ang += 0.03; }
+            draw(){
+                if(!this.active) return;
+                drawMeteor(ctx, this.x, this.y, this.r, this.style, this.ang);
+            }
+            checkHit(px,py){
+                return Math.hypot(px-this.x, py-this.y) < this.r;
+            }
+        }
+
+        function createLevel(lv){
+            targets = []; particles = []; isLevelPass = false;
+            const count = Math.min(6 + Math.floor(lv*1.8), 60);
+            const pad = 70;
+            for(let i=0;i<count;i++){
+                const x = pad + Math.random()*(canvas.width - pad*2);
+                const y = 100 + Math.random()*(canvas.height - pad*2 - 160);
+                targets.push(new Meteor(x,y));
+            }
+            currentLevel = lv;
+            updateTopLevel(lv);
+            renderDots(count, 0);
+            // 每进入新关卡，根据关卡号加载专属BGM
+            playLevelBGM(lv);
+        }
+
+        function spawnParticles(x,y){
+            if(isLevelPass) return;
+            for(let i=0;i<12;i++) particles.push(new Particle(x,y));
+        }
+
+        function handleTouch(e) {
+            e.preventDefault();
+            if(!gameStart) return;
+            const touches = e.touches;
+            for(let i = 0; i < touches.length; i++) {
+                const t = touches[i];
+                spawnParticles(t.clientX, t.clientY);
+            }
+        }
+        window.addEventListener('touchstart', handleTouch);
+        window.addEventListener('touchmove', e=>e.preventDefault());
+
+        window.addEventListener('mousedown',e=>{
+            if(!gameStart) return;
+            spawnParticles(e.clientX, e.clientY);
+        });
+
+        function initGame(){
+            initAudio();
+            initColorPanel();
+            renderLevelList();
+            renderGemList();
+            initRankData();
+            gameStart = true;
+            updateTopLevel(currentLevel);
+            createLevel(currentLevel);
+            animate();
+        }
+
+        function initStartModal() {
+            const hasData = loadProgress();
+            const isFirstRun = !localStorage.getItem(STORAGE_KEY_FIRST_RUN);
+
+            if (isFirstRun) {
+                localStorage.setItem(STORAGE_KEY_FIRST_RUN, 'done');
+                currentLevel = 1;
+                maxUnlockedLevel = 1;
+                saveProgress();
+                initGame();
+            } else {
+                if (hasData) {
+                    startTip.innerText = `检测到历史进度，当前关卡：${currentLevel}`;
+                } else {
+                    startTip.innerText = "暂无历史进度，开始全新游戏";
+                    continueBtn.style.display = 'none';
+                }
+                startModal.style.display = 'block';
+
+                continueBtn.onclick = () => {
+                    startModal.style.display = 'none';
+                    initGame();
+                };
+                // 重新开始：仅回到第1关，保留全部已解锁关卡
+                restartBtn.onclick = () => {
+                    currentLevel = 1;
+                    saveProgress();
+                    startModal.style.display = 'none';
+                    initGame();
+                };
+            }
+        }
+
+        function animate(){
+            ctx.fillStyle = 'rgba(43, 0, 77, 0.12)';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.shadowBlur = 0;
+
+            let allClear = true;
+            let doneCount = 0;
+            targets.forEach(t=>{
+                t.update(); t.draw();
+                if(t.active) allClear = false;
+                else doneCount++;
+            });
+            renderDots(targets.length, doneCount);
+
+            particles = particles.filter(p=>{
+                const alive = p.update();
+                if(!alive) return false;
+                p.draw();
+                targets.forEach(t=>{
+                    if(t.active && t.checkHit(p.x,p.y)){
+                        t.active = false;
+                        playHitSfx(currentLevel);
+                        addLoot(t.data);
+                    }
+                });
+                return true;
+            });
+
+            if(allClear && gameStart && !isLevelPass){
+                isLevelPass = true;
+                stopBGM();
+                if(currentLevel >= maxUnlockedLevel && currentLevel < MAX_LEVEL){
+                    maxUnlockedLevel = currentLevel + 1;
+                    renderLevelList();
+                }
+                currentLevel++;
+                saveProgress();
+                setTimeout(()=>{
+                    if(currentLevel <= MAX_LEVEL) createLevel(currentLevel);
+                },1200);
+            }
+            requestAnimationFrame(animate);
+        }
+
+        initStartModal();
+    </script>
+</body>
+</html>

@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Hardopera">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2b004d">
+    <title>Hardopera</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            background: #2b004d;
+            overflow: hidden;
+            touch-action: none;
+        }
+        body {
+            font-family: system-ui, sans-serif;
+            color: #ccc;
+        }
+        #app {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+            will-change: contents;
+        }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(128, 0, 255, 0.08); }
+        ::-webkit-scrollbar-thumb { background: rgba(128, 0, 255, 0.3); border-radius: 2px; }
+
+        .top-bar {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .game-name, .top-level { font-size: 11px; color: #ccc; }
+        .meteor-dots { display: flex; gap: 2px; max-width: 50vw; overflow: hidden; }
+        .dot { width: 3px; height: 3px; border-radius: 50%; background: #333; }
+        .dot.done { background: #ddd; }
+
+        .nav-bar {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 200;
+        }
+        .nav-item {
+            width: 38px;
+            height: 38px;
+            border: none;
+            background: transparent;
+            color: #ccc;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .nav-item svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+        .nav-item.active { color: #0ff; background: rgba(0,255,255,0.1); }
+
+        .panel {
+            position: fixed;
+            bottom: 56px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92vw;
+            max-width: 500px;
+            max-height: 55vh;
+            background: rgba(25,25,40,0.85);
+            border: 1px solid rgba(128,0,255,0.2);
+            border-radius: 10px;
+            padding: 14px;
+            overflow-y: auto;
+            display: none;
+            z-index: 300;
+        }
+        .panel.show { display: block; }
+        .panel h3 { color: #c084fc; text-align: center; margin-bottom: 12px; font-size: 15px; }
+
+        .mode-switch {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 10px 0 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            flex-wrap: wrap;
+        }
+        .mode-btn {
+            padding: 5px 10px;
+            border: 1px solid rgba(128,0,255,0.4);
+            background: transparent;
+            color: #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            flex: 1;
+            max-width: 90px;
+        }
+        .mode-btn.active {
+            background: rgba(128,0,255,0.25);
+            color: #c084fc;
+        }
+
+        .view-switch { display: flex; justify-content: center; gap: 6px; margin-bottom: 12px; }
+        .view-btn { padding: 3px 8px; border: 1px solid rgba(128,0,255,0.3); background: transparent; color: #ccc; border-radius: 4px; font-size: 12px; }
+        .view-btn.active { background: rgba(128,0,255,0.2); color: #c084fc; }
+
+        .gem-list { display: grid; gap: 8px; }
+        .gem-col-2 { grid-template-columns: repeat(2, 1fr); }
+        .gem-col-5 { grid-template-columns: repeat(5, 1fr); }
+        .gem-col-8 { grid-template-columns: repeat(8, 1fr); }
+        .gem-item { aspect-ratio: 1; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15); overflow: hidden; }
+        .gem-item canvas { width: 100%; height: 100%; }
+
+        .color-list { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 10px; }
+        .color-item { width: 36px; height: 36px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; }
+        .color-item.selected { border-color: #c084fc; box-shadow: 0 0 6px rgba(128,0,255,0.3); }
+
+        .level-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
+        .level-item { padding: 6px 2px; text-align: center; border-radius: 4px; font-size: 13px; }
+        .level-pass { background: rgba(0,180,80,0.2); color: #89ffb8; }
+        .level-lock { background: rgba(60,60,80,0.25); color: #999; }
+
+        .vol-row { margin: 12px 0; display: flex; align-items: center; gap: 8px; }
+        .vol-row label { font-size: 13px; flex: 0 0 60px; }
+        .vol-slider-wrap { flex: 1; }
+        .mute-icon { width: 36px; height: 36px; border: none; background: transparent; color: #ccc; border-radius: 50%; cursor: pointer; }
+        .mute-icon.active { color: #ff6666; }
+
+        input[type="range"] { width: 100%; height: 5px; background: rgba(255,255,255,0.15); border-radius: 3px; -webkit-appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #c084fc; }
+
+        .rank-item { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 13px; }
+        .btn-group { display: flex; justify-content: center; margin: 12px 0; }
+        .log-btn { padding: 4px 12px; border: 1px solid rgba(128,0,255,0.3); background: transparent; color: #ccc; border-radius: 4px; font-size: 13px; }
+        .log-content { margin-top: 10px; padding: 10px; border: 1px solid rgba(128,0,255,0.2); border-radius: 6px; font-size: 12px; display: none; }
+        .log-content.show { display: block; }
+
+        .gem-preview {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .gem-preview.show { display: flex; }
+        .preview-canvas { width: 70vmin; height: 70vmin; max-width: 300px; max-height: 300px; }
+        .save-btn { padding: 8px 20px; background: rgba(128,0,255,0.2); border: 1px solid #c084fc; color: #c084fc; border-radius: 4px; font-size: 14px; margin-top: 20px; }
+
+        .start-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 88vw;
+            max-width: 340px;
+            background: rgba(25,25,40,0.95);
+            border: 1px solid rgba(128,0,255,0.3);
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 9999;
+            display: none;
+            text-align: center;
+        }
+        .start-modal h2 { color: #c084fc; margin-bottom: 12px; font-size: 17px; }
+        .start-tip { font-size: 13px; color: #ccc; margin-bottom: 20px; }
+        .modal-btn { min-width: 100px; padding: 8px 0; margin: 0 6px; border: 1px solid #c084fc; background: rgba(128,0,255,0.1); color: #c084fc; border-radius: 6px; font-size: 14px; }
+
+        .lag-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85vw;
+            max-width: 320px;
+            background: #191928;
+            border: 1px solid #c084fc;
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 10000;
+            display: none;
+            text-align: center;
+        }
+        .lag-modal h3 { color: #ff8888; margin-bottom: 10px; font-size: 16px; }
+        .lag-modal p { color: #ccc; font-size: 13px; line-height: 1.5; margin-bottom: 18px; }
+        .lag-btn {
+            padding: 7px 16px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .lag-btn.switch { background: #c084fc; color: #fff; }
+        .lag-btn.ignore { background: #444; color: #ccc; }
+
+        .pass-tip {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Oxanium', sans-serif;
+            font-size: 48px;
+            color: #fff;
+            text-shadow: 0 0 12px #c084fc;
+            z-index: 800;
+            pointer-events: none;
+            display: none;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <canvas id="gameCanvas"></canvas>
+        <div class="pass-tip" id="passTip"></div>
+
+        <div class="lag-modal" id="lagModal">
+            <h3>检测到游戏卡顿</h3>
+            <p>当前设备运行缓慢，推荐切换为【快速视觉】模式，提升流畅度！</p>
+            <button class="lag-btn switch" id="switchModeBtn">切换快速视觉</button>
+            <button class="lag-btn ignore" id="ignoreLagBtn">暂时忽略</button>
+        </div>
+
+        <div class="top-bar">
+            <div class="game-name">Hardopera</div>
+            <div class="meteor-dots" id="dotContainer"></div>
+            <div class="top-level" id="topLevel">1</div>
+        </div>
+
+        <div class="nav-bar">
+            <button class="nav-item" data-panel="colorPanel">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+            </button>
+            <button class="nav-item" data-panel="levelPanel">
+                <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            </button>
+            <button class="nav-item" data-panel="treasurePanel">
+                <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </button>
+            <button class="nav-item" data-panel="volPanel">
+                <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            </button>
+            <button class="nav-item" data-panel="rankPanel">
+                <svg viewBox="0 0 24 24"><line x1="7" y1="20" x2="7" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="14"/></svg>
+            </button>
+            <button class="nav-item" id="fullscreenBtn">
+                <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+            <button class="nav-item" data-panel="infoPanel">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </button>
+        </div>
+
+        <div class="panel" id="colorPanel">
+            <h3>视觉风格 & 色调</h3>
+            <div class="mode-switch">
+                <button class="mode-btn active" data-mode="super">超级视觉</button>
+                <button class="mode-btn" data-mode="standard">标准流畅</button>
+                <button class="mode-btn" data-mode="fast">快速视觉</button>
+            </div>
+            <div class="color-list" id="colorList"></div>
+        </div>
+
+        <div class="panel" id="levelPanel"><h3>关卡</h3><div class="level-list" id="levelList"></div></div>
+        <div class="panel" id="treasurePanel">
+            <h3>宝库</h3>
+            <div class="view-switch">
+                <button class="view-btn active" data-col="2">两列</button>
+                <button class="view-btn" data-col="5">五列</button>
+                <button class="view-btn" data-col="8">八列</button>
+            </div>
+            <div class="gem-list gem-col-2" id="gemList"></div>
+        </div>
+        <div class="panel" id="volPanel">
+            <h3>音量</h3>
+            <div class="vol-row">
+                <label>背景音乐</label>
+                <div class="vol-slider-wrap">
+                    <input type="range" id="bgmVol" min="0" max="100" value="50">
+                </div>
+                <button class="mute-icon" id="bgmMute">
+                    <svg class="icon-vol" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                    <svg class="icon-mute" style="display:none;" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="19" y1="9" x2="13" y2="15"/><line x1="13" y1="9" x2="19" y2="15"/></svg>
+                </button>
+            </div>
+            <div class="vol-row">
+                <label>游戏音效</label>
+                <div class="vol-slider-wrap">
+                    <input type="range" id="sfxVol" min="0" max="100" value="50">
+                </div>
+                <button class="mute-icon" id="sfxMute">
+                    <svg class="icon-vol" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                    <svg class="icon-mute" style="display:none;" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="19" y1="9" x2="13" y2="15"/><line x1="13" y1="9" x2="19" y2="15"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="panel" id="rankPanel"><h3>排行</h3><div id="rankList"></div></div>
+        <div class="panel" id="infoPanel">
+            <h3>游戏说明</h3>
+            <p style="line-height:1.5;font-size:13px;">点击屏幕发射粒子击碎陨石闯关。<br>快速视觉：极致流畅，低配手机首选</p>
+            <div class="btn-group"><button class="log-btn" id="logBtn">运行状态</button></div>
+            <div class="log-content" id="logContent">自动帧率检测，三档画质自由切换</div>
+        </div>
+
+        <div class="gem-preview" id="gemPreview">
+            <canvas class="preview-canvas" id="previewCanvas"></canvas>
+            <button class="save-btn" id="saveGemBtn">保存图片</button>
+        </div>
+
+        <div class="start-modal" id="startModal">
+            <h2>Hardopera</h2>
+            <p class="start-tip" id="startTip"></p>
+            <button class="modal-btn" id="continueBtn">继续游戏</button>
+            <button class="modal-btn" id="restartBtn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('dragstart', e => e.preventDefault());
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const topLevel = document.getElementById('topLevel');
+        const dotContainer = document.getElementById('dotContainer');
+        const colorList = document.getElementById('colorList');
+        const levelList = document.getElementById('levelList');
+        const gemList = document.getElementById('gemList');
+        const bgmVol = document.getElementById('bgmVol');
+        const sfxVol = document.getElementById('sfxVol');
+        const bgmMute = document.getElementById('bgmMute');
+        const sfxMute = document.getElementById('sfxMute');
+        const navItems = document.querySelectorAll('.nav-item');
+        const panels = document.querySelectorAll('.panel');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const viewBtns = document.querySelectorAll('.view-btn');
+        const gemPreview = document.getElementById('gemPreview');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const preCtx = previewCanvas.getContext('2d');
+        const saveGemBtn = document.getElementById('saveGemBtn');
+        const rankList = document.getElementById('rankList');
+        const logBtn = document.getElementById('logBtn');
+        const logContent = document.getElementById('logContent');
+        const startModal = document.getElementById('startModal');
+        const startTip = document.getElementById('startTip');
+        const continueBtn = document.getElementById('continueBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const lagModal = document.getElementById('lagModal');
+        const switchModeBtn = document.getElementById('switchModeBtn');
+        const ignoreLagBtn = document.getElementById('ignoreLagBtn');
+        const passTip = document.getElementById('passTip');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+
+        const MAX_LEVEL = 999;
+        let currentLevel = 1, maxUnlockedLevel = 1;
+        let gameStart = false, isLevelPass = false;
+        let particles = [], targets = [], lootArr = [];
+        let bgmMuted = false, sfxMuted = false;
+        let currentViewCol = 2, previewGemData = null;
+        const previewRotateTime = 3000;
+        let audioCtx = null, bgmTimer = null, bgmGain, sfxGain;
+        let animationId = null;
+        let hasShowLagTip = false;
+
+        let visualMode = "super";
+        const MODE_CONFIG = {
+            super: {
+                maxParticle: 12,
+                enableShadow: true,
+                complexShape: true,
+                baseEnemy: 12,
+                audioDur: 0.5
+            },
+            standard: {
+                maxParticle: 2,
+                enableShadow: false,
+                complexShape: false,
+                baseEnemy: 10,
+                audioDur: 0.5
+            },
+            fast: {
+                maxParticle: 1,
+                enableShadow: false,
+                complexShape: false,
+                baseEnemy: 8,
+                audioDur: 0.5
+            }
+        };
+        let config = { ...MODE_CONFIG.super };
+
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let currentFPS = 60;
+        const PERF_CHECK_INTERVAL = 1500;
+        let perfCheckTimer = null;
+        const LAG_THRESHOLD = 28;
+
+        function checkFPS() {
+            const now = performance.now();
+            const delta = now - lastTime;
+            currentFPS = Math.round(frameCount * 1000 / delta);
+            frameCount = 0;
+            lastTime = now;
+
+            if ((visualMode === "super" || visualMode === "standard") && currentFPS < LAG_THRESHOLD && !hasShowLagTip) {
+                lagModal.style.display = "block";
+                hasShowLagTip = true;
+            }
+        }
+
+        function startPerfDetect() {
+            if (!perfCheckTimer) perfCheckTimer = setInterval(checkFPS, PERF_CHECK_INTERVAL);
+        }
+        function stopPerfDetect() {
+            if (perfCheckTimer) { clearInterval(perfCheckTimer); perfCheckTimer = null; }
+        }
+
+        function switchVisualMode(mode) {
+            visualMode = mode;
+            hasShowLagTip = false;
+            modeBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+            config = { ...MODE_CONFIG[mode] };
+            lagModal.style.display = "none";
+            if (gameStart) createLevel(currentLevel);
+        }
+
+        modeBtns.forEach(btn => btn.addEventListener('click', () => switchVisualMode(btn.dataset.mode)));
+        switchModeBtn.addEventListener('click', () => switchVisualMode("fast"));
+        ignoreLagBtn.addEventListener('click', () => lagModal.style.display = "none");
+
+        // ========== Hardstyle 硬派电子 BGM（150BPM、强鼓点、失真底鼓、激昂旋律）[[__LINK_ICON]](https://m.baike.com/wiki/Hardstyle/5885271?f_link_type=f_linkinlinenote&flow_extra=eyJpbmxpbmVfZGlzcGxheV9wb3NpdGlvbiI6MCwiZG9jX3Bvc2l0aW9uIjowLCJkb2NfaWQiOiIwYWRlYzZkYjkxNWFjY2UyLTZjOTMwNzRkYjg4ODczMTMifQ%3D%3D "[__LINK_ICON]") ==========
+        // 10 首完全不同的 Hardstyle 循环段落，每关随机
+        const BGM_LIST = [
+            // 1：经典 Hardstyle（强底鼓+锯齿主音）
+            [55, 110, 165, 220, 275, 330, 385, 440, 385, 330, 275, 220, 165, 110, 55, 110],
+            // 2：Euphoric Hardstyle（旋律向+大气和弦）
+            [220, 277.18, 329.63, 369.99, 440, 493.88, 554.37, 659.25, 554.37, 493.88, 440, 369.99, 329.63, 277.18, 220, 246.94],
+            // 3：Raw Hardstyle（黑暗失真+重型底鼓）
+            [65.41, 130.81, 196, 261.63, 329.63, 392, 466.16, 523.25, 466.16, 392, 329.63, 261.63, 196, 130.81, 65.41, 98],
+            // 4：150BPM 高能冲刺型[[__LINK_ICON]](https://m.baike.com/wiki/Hardstyle/5885271?f_link_type=f_linkinlinenote&flow_extra=eyJpbmxpbmVfZGlzcGxheV9wb3NpdGlvbiI6MCwiZG9jX3Bvc2l0aW9uIjowLCJkb2NfaWQiOiIwYWRlYzZkYjkxNWFjY2UyLTZjOTMwNzRkYjg4ODczMTMifQ%3D%3D "[__LINK_ICON]")
+            [146.83, 220, 293.66, 369.99, 440, 523.25, 587.33, 659.25, 587.33, 523.25, 440, 369.99, 293.66, 220, 146.83, 174.61],
+            // 5：带反拍贝斯（Reverse Bass）
+            [82.41, 164.81, 246.94, 329.63, 415.30, 493.88, 587.33, 698.46, 587.33, 493.88, 415.30, 329.63, 246.94, 164.81, 82.41, 123.47],
+            // 6：史诗氛围+强力 Drop
+            [196, 261.63, 329.63, 440, 523.25, 659.25, 783.99, 880, 783.99, 659.25, 523.25, 440, 329.63, 261.63, 196, 220],
+            // 7：急促节奏+失真主音
+            [110, 220, 330, 440, 550, 660, 770, 880, 770, 660, 550, 440, 330, 220, 110, 165],
+            // 8：深沉底鼓+高频锯齿
+            [55, 165, 275, 385, 495, 605, 715, 825, 715, 605, 495, 385, 275, 165, 55, 110],
+            // 9：明亮旋律+硬派鼓组
+            [246.94, 329.63, 415.30, 493.88, 587.33, 698.46, 783.99, 880, 783.99, 698.46, 587.33, 493.88, 415.30, 329.63, 246.94, 293.66],
+            // 10：暗黑高能+强烈冲击
+            [73.42, 146.83, 220, 293.66, 369.99, 440, 523.25, 587.33, 523.25, 440, 369.99, 293.66, 220, 146.83, 73.42, 98]
+        ];
+
+        const colorThemes = [
+            { main: '#ff00ff', sub: '#00ffff', name: '霓虹青粉' },
+            { main: '#ffff00', sub: '#ff8800', name: '暖黄橙光' },
+            { main: '#00ff88', sub: '#00aaff', name: '清新蓝绿' },
+            { main: '#ff4444', sub: '#ffaa00', name: '烈焰橙红' },
+            { main: '#aa44ff', sub: '#44ffaa', name: '梦幻紫绿' }
+        ];
+        let currentTheme = 0;
+
+        const STORAGE_KEY_PROGRESS = 'game_progress_data';
+        const STORAGE_KEY_RANK = 'game_rank_data';
+
+        function toggleMuteIcon(btn, isMute) {
+            const vol = btn.querySelector('.icon-vol');
+            const mut = btn.querySelector('.icon-mute');
+            vol.style.display = isMute ? 'none' : 'block';
+            mut.style.display = isMute ? 'block' : 'none';
+        }
+
+        function loadProgress() {
+            const data = localStorage.getItem(STORAGE_KEY_PROGRESS);
+            if (data) {
+                const obj = JSON.parse(data);
+                currentLevel = obj.currentLevel || 1;
+                maxUnlockedLevel = obj.maxUnlockedLevel || 1;
+                return true;
+            }
+            return false;
+        }
+        function saveProgress() {
+            localStorage.setItem(STORAGE_KEY_PROGRESS, JSON.stringify({ currentLevel, maxUnlockedLevel }));
+        }
+
+        function initRankData() {
+            let rank = localStorage.getItem(STORAGE_KEY_RANK);
+            if (!rank) rank = JSON.stringify([
+                { name: "挑战者", level: 128 },
+                { name: "旅人", level: 96 },
+                { name: "行者", level: 72 },
+                { name: "新手", level: 24 },
+                { name: "初见", level: 8 }
+            ]);
+            renderRank(JSON.parse(rank));
+        }
+        function renderRank(list) {
+            rankList.innerHTML = '';
+            list.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = 'rank-item';
+                div.innerText = `${idx + 1}. ${item.name} - 通关${item.level}关`;
+                rankList.appendChild(div);
+            });
+        }
+
+        function getRandomStyle() {
+            const sides = config.complexShape ? (Math.floor(Math.random() * 4) + 5) : 5;
+            const r1 = ~~(Math.random() * 256), g1 = ~~(Math.random() * 256), b1 = ~~(Math.random() * 256);
+            const r2 = ~~(Math.random() * 256), g2 = ~~(Math.random() * 256), b2 = ~~(Math.random() * 256);
+            return { sides, c1: `rgb(${r1},${g1},${b1})`, c2: `rgb(${r2},${g2},${b2})` };
+        }
+
+        function drawShape(c, x, y, r, style, rot = 0) {
+            c.save();
+            c.translate(x, y);
+            c.rotate(rot);
+            c.beginPath();
+            const s = style.sides;
+            for (let i = 0; i < s; i++) {
+                const ang = Math.PI * 2 / s * i;
+                const cr = config.complexShape ? r * (0.7 + Math.sin(rot + i) * 0.2) : r;
+                const px = Math.cos(ang) * cr;
+                const py = Math.sin(ang) * cr;
+                i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+            }
+            c.closePath();
+            const grad = c.createRadialGradient(0, 0, 0, 0, 0, r);
+            grad.addColorStop(0, style.c1);
+            grad.addColorStop(1, style.c2);
+            c.fillStyle = grad;
+            c.shadowBlur = config.enableShadow ? 8 : 0;
+            c.shadowColor = style.c1;
+            c.fill();
+            c.restore();
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            previewCanvas.width = 320;
+            previewCanvas.height = 320;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function toggleFullScreen() {
+            const el = document.documentElement;
+            const isFull = !!document.fullscreenElement;
+            isFull ? document.exitFullscreen() : el.requestFullscreen();
+        }
+        fullscreenBtn.addEventListener('click', toggleFullScreen);
+
+        logBtn.addEventListener('click', () => logContent.classList.toggle('show'));
+        function updateLvText(lv) { topLevel.innerText = lv; }
+
+        viewBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                viewBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentViewCol = +btn.dataset.col;
+                gemList.className = `gem-list gem-col-${currentViewCol}`;
+            });
+        });
+
+        function renderGemUI() {
+            gemList.innerHTML = '';
+            lootArr.forEach(style => {
+                const item = document.createElement('div');
+                item.className = 'gem-item';
+                const c = document.createElement('canvas');
+                c.width = 80; c.height = 80;
+                const gctx = c.getContext('2d');
+                drawShape(gctx, 40, 40, 32, style, 0);
+                item.appendChild(c);
+                item.onclick = () => openPreview(style);
+                gemList.appendChild(item);
+            });
+        }
+        function openPreview(style) {
+            previewGemData = style;
+            gemPreview.classList.add('show');
+            const st = Date.now();
+            function rot() {
+                const d = Date.now() - st;
+                const r = (d / previewRotateTime) * Math.PI * 2;
+                preCtx.clearRect(0, 0, 320, 320);
+                drawShape(preCtx, 160, 160, 100, style, r);
+                if (d < previewRotateTime) requestAnimationFrame(rot);
+            }
+            rot();
+        }
+        gemPreview.addEventListener('click', e => { if (e.target === gemPreview) gemPreview.classList.remove('show'); });
+
+        saveGemBtn.addEventListener('click', () => {
+            if (!previewGemData) return;
+            const temp = document.createElement('canvas');
+            const tctx = temp.getContext('2d');
+            temp.width = 400; temp.height = 500;
+            tctx.fillStyle = '#2b004d';
+            tctx.fillRect(0, 0, 400, 500);
+            tctx.fillStyle = '#fff';
+            tctx.font = 'bold 20px sans-serif';
+            tctx.textAlign = 'center';
+            tctx.fillText('Hardopera', 200, 50);
+            drawShape(tctx, 200, 220, 120, previewGemData, 0);
+            const a = document.createElement('a');
+            a.download = `Gem_${Date.now()}.png`;
+            a.href = temp.toDataURL('image/png');
+            a.click();
+        });
+
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const p = document.getElementById(item.dataset.panel);
+                panels.forEach(x => x.classList.remove('show'));
+                navItems.forEach(x => x.classList.remove('active'));
+                if (p) p.classList.add('show');
+                item.classList.add('active');
+            });
+        });
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.nav-bar') && !e.target.closest('.panel')) {
+                panels.forEach(x => x.classList.remove('show'));
+                navItems.forEach(x => x.classList.remove('active'));
+            }
+        });
+
+        function initColorUI() {
+            colorList.innerHTML = '';
+            colorThemes.forEach((t, i) => {
+                const div = document.createElement('div');
+                div.className = 'color-item' + (i === currentTheme ? ' selected' : '');
+                div.style.background = `linear-gradient(45deg,${t.main},${t.sub})`;
+                div.onclick = () => { currentTheme = i; initColorUI(); };
+                colorList.appendChild(div);
+            });
+        }
+
+        function renderLevelUI() {
+            levelList.innerHTML = '';
+            for (let i = 1; i <= MAX_LEVEL; i++) {
+                const div = document.createElement('div');
+                div.className = 'level-item ' + (i <= maxUnlockedLevel ? 'level-pass' : 'level-lock');
+                div.innerText = i;
+                if (i <= maxUnlockedLevel) {
+                    div.onclick = () => {
+                        if (gameStart) {
+                            currentLevel = i;
+                            createLevel(i);
+                            saveProgress();
+                            panels.forEach(p => p.classList.remove('show'));
+                        }
+                    };
+                }
+                levelList.appendChild(div);
+            }
+        }
+
+        function renderDotsUI(total, done) {
+            dotContainer.innerHTML = '';
+            for (let i = 0; i < total; i++) {
+                const d = document.createElement('div');
+                d.className = 'dot' + (i < done ? ' done' : '');
+                dotContainer.appendChild(d);
+            }
+        }
+
+        function addLootItem(style) {
+            lootArr.push(style);
+            renderGemUI();
+        }
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            bgmGain = audioCtx.createGain();
+            sfxGain = audioCtx.createGain();
+            bgmGain.gain.value = bgmVol.value / 100;
+            sfxGain.gain.value = sfxVol.value / 100;
+            bgmGain.connect(audioCtx.destination);
+            sfxGain.connect(audioCtx.destination);
+        }
+        function setVolume() {
+            if (!audioCtx) return;
+            bgmGain.gain.value = bgmMuted ? 0 : bgmVol.value / 100;
+            sfxGain.gain.value = sfxMuted ? 0 : sfxVol.value / 100;
+        }
+        bgmVol.addEventListener('input', setVolume);
+        sfxVol.addEventListener('input', setVolume);
+
+        // 随机选一首 BGM
+        function getRandomBGM() {
+            const idx = Math.floor(Math.random() * BGM_LIST.length);
+            return BGM_LIST[idx];
+        }
+
+        function playBGM() {
+            if (bgmMuted || !audioCtx) return;
+            stopBGM();
+            const melody = getRandomBGM(); // 每关随机
+            const beat = 0.4; // 150BPM 硬派节奏[[__LINK_ICON]](https://m.baike.com/wiki/Hardstyle/5885271?f_link_type=f_linkinlinenote&flow_extra=eyJpbmxpbmVfZGlzcGxheV9wb3NpdGlvbiI6MCwiZG9jX3Bvc2l0aW9uIjowLCJkb2NfaWQiOiIwYWRlYzZkYjkxNWFjY2UyLTZjOTMwNzRkYjg4ODczMTMifQ%3D%3D "[__LINK_ICON]")
+            function loop() {
+                if (!gameStart || isLevelPass || bgmMuted) return;
+                melody.forEach((freq, idx) => playNote(freq, idx * beat, config.audioDur));
+                bgmTimer = setTimeout(loop, melody.length * beat * 1000);
+            }
+            loop();
+        }
+        function stopBGM() { if (bgmTimer) clearTimeout(bgmTimer); bgmTimer = null; }
+
+        // Hardstyle 专用音色：失真锯齿波+强底鼓
+        function playNote(freq, time = 0, dur = 0.5) {
+            if (sfxMuted || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+            osc.connect(gain);
+            gain.connect(filter);
+            filter.connect(audioCtx.destination);
+
+            osc.type = 'sawtooth'; // 锯齿波，Hardstyle 标志性音色
+            osc.frequency.value = freq;
+            filter.type = 'highpass';
+            filter.frequency.value = 200; // 滤低频，更干净
+
+            const now = audioCtx.currentTime + time;
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.35, now + 0.01); // 硬派强音头
+            gain.gain.linearRampToValueAtTime(0.001, now + dur);
+            osc.start(now);
+            osc.stop(now + dur + 0.05);
+        }
+        // 打击音效：短而硬
+        function playHitSound() {
+            playNote(660, 0, 0.15);
+        }
+
+        bgmMute.addEventListener('click', () => {
+            bgmMuted = !bgmMuted;
+            toggleMuteIcon(bgmMute, bgmMuted);
+            setVolume();
+            bgmMuted ? stopBGM() : playBGM();
+        });
+        sfxMute.addEventListener('click', () => {
+            sfxMuted = !sfxMuted;
+            toggleMuteIcon(sfxMute, sfxMuted);
+            setVolume();
+        });
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.5 + Math.random() * 3;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.r = 2 + Math.random() * 3;
+                this.life = 80;
+                const t = colorThemes[currentTheme];
+                this.color = Math.random() > 0.5 ? t.main : t.sub;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.015;
+                this.life--;
+                return this.life > 0;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = config.enableShadow ? 8 : 0;
+                ctx.shadowColor = this.color;
+                ctx.fill();
+            }
+        }
+
+        class Meteor {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.r = 22;
+                this.active = true;
+                this.ang = 0;
+                this.style = getRandomStyle();
+                this.hitRadius = 38;
+            }
+            update() { this.ang += 0.025; }
+            draw() { if (this.active) drawShape(ctx, this.x, this.y, this.r, this.style, this.ang); }
+            hitTest(px, py) { return Math.hypot(px - this.x, py - this.y) < this.hitRadius; }
+        }
+
+        function createLevel(lv) {
+            targets.length = 0;
+            particles.length = 0;
+            isLevelPass = false;
+            hasShowLagTip = false;
+
+            const base = 3 + Math.floor(lv * 0.8);
+            const count = Math.min(base, config.baseEnemy);
+            const pad = 60;
+            for (let i = 0; i < count; i++) {
+                const x = pad + Math.random() * (canvas.width - pad * 2);
+                const y = 90 + Math.random() * (canvas.height - pad * 2 - 120);
+                targets.push(new Meteor(x, y));
+            }
+            updateLvText(lv);
+            renderDotsUI(count, 0);
+            playBGM(); // 每关随机 Hardstyle
+        }
+
+        function spawnParticle(x, y) {
+            if (isLevelPass) return;
+            const num = config.maxParticle;
+            for (let i = 0; i < num; i++) particles.push(new Particle(x, y));
+        }
+
+        function onTouch(e) {
+            e.preventDefault();
+            if (!gameStart) return;
+            const touches = e.touches;
+            for (let i = 0; i < touches.length; i++) spawnParticle(touches[i].clientX, touches[i].clientY);
+        }
+        window.addEventListener('touchstart', onTouch);
+        window.addEventListener('touchmove', e => e.preventDefault());
+        window.addEventListener('mousedown', e => { if (gameStart) spawnParticle(e.clientX, e.clientY); });
+
+        function gameLoop() {
+            frameCount++;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            particles = particles.filter(p => { p.update(); p.draw(); return p.life > 0; });
+
+            let done = 0;
+            targets.forEach(m => {
+                m.update();
+                m.draw();
+                if (!m.active) { done++; return; }
+                particles.forEach(p => {
+                    if (m.active && m.hitTest(p.x, p.y)) {
+                        m.active = false;
+                        playHitSound();
+                        addLootItem(m.style);
+                    }
+                });
+            });
+
+            renderDotsUI(targets.length, done);
+
+            if (done >= targets.length && !isLevelPass) {
+                isLevelPass = true;
+                const nextLv = currentLevel + 1;
+                passTip.innerText = nextLv;
+                passTip.style.display = "block";
+
+                if (currentLevel < MAX_LEVEL) {
+                    maxUnlockedLevel = nextLv;
+                    saveProgress();
+                    renderLevelUI();
+                }
+
+                setTimeout(() => {
+                    passTip.style.display = "none";
+                    if (currentLevel < MAX_LEVEL) {
+                        currentLevel = nextLv;
+                        createLevel(currentLevel);
+                    }
+                }, 1200);
+            }
+
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function init() {
+            loadProgress();
+            initColorUI();
+            renderLevelUI();
+            initRankData();
+            renderGemUI();
+
+            const hasRecord = loadProgress();
+            startTip.innerText = hasRecord ? `当前关卡：${currentLevel}` : '欢迎开始游戏';
+            startModal.style.display = 'block';
+
+            continueBtn.onclick = () => {
+                startModal.style.display = 'none';
+                gameStart = true;
+                initAudio();
+                createLevel(currentLevel);
+                startPerfDetect();
+                gameLoop();
+            };
+            restartBtn.onclick = () => {
+                currentLevel = 1;
+                maxUnlockedLevel = 1;
+                saveProgress();
+                renderLevelUI();
+                startModal.style.display = 'none';
+                gameStart = true;
+                initAudio();
+                createLevel(1);
+                startPerfDetect();
+                gameLoop();
+            };
+        }
+
+        window.addEventListener('beforeunload', () => {
+            stopPerfDetect();
+            stopBGM();
+            if (animationId) cancelAnimationFrame(animationId);
+            particles = [];
+            targets = [];
+        });
+
+        init();
+    </script>
+</body>
+</html>

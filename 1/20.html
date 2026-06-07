@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="粒子闯关">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <title>炫彩粒子陨石闯关</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #app {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 顶部整体居中容器 */
+        .top-bar {
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            pointer-events: none;
+        }
+        .game-name {
+            color: #cccccc;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .top-level {
+            color: #cccccc;
+            font-size: 13px;
+            line-height: 1;
+        }
+        /* 进度点：强制单行、禁止换行 */
+        .meteor-dots {
+            display: flex;
+            gap: 2px;
+            flex-wrap: nowrap;
+            max-width: 60vw;
+            overflow: hidden;
+        }
+        /* 缩小圆点 + 深灰/亮灰配色 */
+        .dot {
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background: #333333; /* 未完成：深灰色 */
+        }
+        .dot.done {
+            background: #dddddd; /* 已完成：亮灰色 */
+        }
+
+        /* 底部导航 */
+        .nav-bar {
+            position: fixed;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 200;
+        }
+        .nav-item {
+            width: 42px;
+            height: 42px;
+            border: none;
+            background: transparent;
+            color: #cccccc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .nav-item.active {
+            color: #0ff;
+            background: rgba(0, 255, 255, 0.12);
+        }
+        .nav-item:hover {
+            color: #fff;
+        }
+
+        /* 通用面板 */
+        .panel {
+            position: fixed;
+            bottom: 62px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92vw;
+            max-width: 600px;
+            max-height: 60vh;
+            background: rgba(25, 25, 40, 0.75);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.25);
+            border-radius: 12px;
+            padding: 18px;
+            color: #e6e6e6;
+            overflow-y: auto;
+            display: none;
+            z-index: 300;
+        }
+        .panel.show {
+            display: block;
+        }
+        .panel h3 {
+            color: #80ffff;
+            text-align: center;
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+
+        /* 宝库按钮 */
+        .view-switch {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .view-btn {
+            padding: 4px 10px;
+            border: 1px solid rgba(0,255,255,0.3);
+            background: transparent;
+            color: #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .view-btn.active {
+            background: rgba(0,255,255,0.2);
+            color: #0ff;
+        }
+
+        /* 宝库列表 */
+        .gem-list {
+            display: grid;
+            gap: 10px;
+        }
+        .gem-col-2 { grid-template-columns: repeat(2, 1fr); }
+        .gem-col-5 { grid-template-columns: repeat(5, 1fr); }
+        .gem-col-8 { grid-template-columns: repeat(8, 1fr); }
+        .gem-item {
+            aspect-ratio: 1;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .gem-item canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 其他面板样式 */
+        .color-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+        .color-item {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .color-item.selected {
+            border-color: #80ffff;
+            box-shadow: 0 0 8px rgba(0,255,255,0.4);
+            transform: scale(1.05);
+        }
+        .level-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+            gap: 8px;
+        }
+        .level-item {
+            padding: 8px 4px;
+            text-align: center;
+            border-radius: 6px;
+            font-size: 14px;
+            border: 1px solid transparent;
+            transition: 0.2s;
+        }
+        .level-pass {
+            background: rgba(0, 180, 80, 0.25);
+            color: #89ffb8;
+            border-color: rgba(0, 220, 100, 0.3);
+        }
+        .level-lock {
+            background: rgba(60, 60, 80, 0.3);
+            color: #999;
+        }
+        .level-item:hover {
+            transform: translateY(-2px);
+        }
+        .vol-row {
+            margin: 14px 0;
+        }
+        .vol-row label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #ccc;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #80ffff;
+            cursor: pointer;
+        }
+        .mute-btn {
+            margin-top: 10px;
+            padding: 8px 14px;
+            background: rgba(255, 80, 80, 0.25);
+            border: 1px solid rgba(255, 100, 100, 0.35);
+            color: #ff9999;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .rank-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 14px;
+        }
+
+        /* 宝石预览层 */
+        .gem-preview {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .gem-preview.show {
+            display: flex;
+        }
+        .preview-canvas {
+            width: 70vmin;
+            height: 70vmin;
+            margin-bottom: 30px;
+        }
+        .save-btn {
+            padding: 10px 24px;
+            background: rgba(0,255,255,0.2);
+            border: 1px solid #0ff;
+            color: #0ff;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- 顶部：名称 + 关卡 + 进度 同行居中 -->
+        <div class="top-bar">
+            <div class="game-name">炫彩粒子陨石闯关</div>
+            <div class="top-level" id="topLevel">1</div>
+            <div class="meteor-dots" id="dotContainer"></div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="nav-bar">
+            <button class="nav-item" data-panel="colorPanel">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+            </button>
+            <button class="nav-item" data-panel="levelPanel">
+                <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            </button>
+            <button class="nav-item" data-panel="treasurePanel">
+                <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </button>
+            <button class="nav-item" data-panel="volPanel">
+                <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            </button>
+            <button class="nav-item" data-panel="rankPanel">
+                <svg viewBox="0 0 24 24"><line x1="7" y1="20" x2="7" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="17" y1="20" x2="17" y2="14"/></svg>
+            </button>
+            <button class="nav-item" id="fullscreenBtn">
+                <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            </button>
+            <button class="nav-item" data-panel="infoPanel">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </button>
+        </div>
+
+        <!-- 面板区域 -->
+        <div class="panel" id="colorPanel"><h3>皮肤色彩设置</h3><div class="color-list" id="colorList"></div></div>
+        <div class="panel" id="levelPanel"><h3>关卡列表</h3><div class="level-list" id="levelList"></div></div>
+        <div class="panel" id="treasurePanel">
+            <h3>宝库</h3>
+            <div class="view-switch">
+                <button class="view-btn active" data-col="2">两列</button>
+                <button class="view-btn" data-col="5">五列</button>
+                <button class="view-btn" data-col="8">八列</button>
+            </div>
+            <div class="gem-list gem-col-2" id="gemList"></div>
+        </div>
+        <div class="panel" id="volPanel">
+            <h3>音量设置</h3>
+            <div class="vol-row"><label>背景音乐</label><input type="range" id="bgmVol" min="0" max="100" value="60"></div>
+            <div class="vol-row"><label>游戏音效</label><input type="range" id="sfxVol" min="0" max="100" value="60"></div>
+            <button class="mute-btn" id="muteAll">全局静音</button>
+        </div>
+        <div class="panel" id="rankPanel">
+            <h3>玩家排行榜</h3>
+            <div id="rankList">
+                <div class="rank-item">1. 挑战者 - 通关 128 关</div>
+                <div class="rank-item">2. 星光旅人 - 通关 96 关</div>
+                <div class="rank-item">3. 粒子大师 - 通关 72 关</div>
+                <div class="rank-item">4. 新手玩家 - 通关 24 关</div>
+                <div class="rank-item">5. 初始玩家 - 通关 8 关</div>
+            </div>
+        </div>
+        <div class="panel" id="infoPanel">
+            <h3>游戏说明 & 全屏指引</h3>
+            <p style="line-height:1.6;">简介：点击屏幕发射炫彩粒子，击碎所有陨石即可通关，总计999个关卡，难度逐步提升。<br><br><strong>苹果手机全屏教程：</strong><br>1. 首次进入任意点击屏幕即可全屏；<br>2. Safari浏览器点击底部「分享」→ 选择「添加到主屏幕」；<br>3. 回到桌面点击游戏图标，即可完全全屏（隐藏浏览器栏）。</p>
+        </div>
+
+        <!-- 宝石预览 -->
+        <div class="gem-preview" id="gemPreview">
+            <canvas class="preview-canvas" id="previewCanvas"></canvas>
+            <button class="save-btn" id="saveGemBtn">保存宝石图片</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const topLevel = document.getElementById('topLevel');
+        const dotContainer = document.getElementById('dotContainer');
+        const colorList = document.getElementById('colorList');
+        const levelList = document.getElementById('levelList');
+        const gemList = document.getElementById('gemList');
+        const bgmVol = document.getElementById('bgmVol');
+        const sfxVol = document.getElementById('sfxVol');
+        const muteAll = document.getElementById('muteAll');
+        const navItems = document.querySelectorAll('.nav-item');
+        const panels = document.querySelectorAll('.panel');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const viewBtns = document.querySelectorAll('.view-btn');
+        const gemPreview = document.getElementById('gemPreview');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const preCtx = previewCanvas.getContext('2d');
+        const saveGemBtn = document.getElementById('saveGemBtn');
+
+        const MAX_LEVEL = 999;
+        const GAME_NAME = "炫彩粒子陨石闯关";
+        const GAME_URL = "www.hardopera.com";
+        let currentLevel = 1, maxUnlockedLevel = 1;
+        let gameStart = false, isLevelPass = false;
+        let particles = [], targets = [], lootArr = [];
+        let isMute = false, firstClickDone = false;
+        let currentViewCol = 2, previewGemData = null;
+        const previewRotateTime = 3000;
+        let audioCtx = null, bgmTimer = null, bgmGain, sfxGain;
+
+        const pianoMelodies = [
+            [261.63, 293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66],
+            [293.66, 329.63, 349.23, 392.00, 440.00, 392.00, 349.23, 329.63],
+            [329.63, 349.23, 392.00, 440.00, 493.88, 440.00, 392.00, 349.23]
+        ];
+        const colorThemes = [
+            {main:'#ff00ff',sub:'#00ffff'},{main:'#ffff00',sub:'#ff8800'},
+            {main:'#00ff88',sub:'#00aaff'},{main:'#ff4444',sub:'#ffaa00'},
+            {main:'#aa44ff',sub:'#44ffaa'},{main:'#ffffff',sub:'#8888ff'}
+        ];
+        let currentTheme = 0;
+
+        // 生成陨石样式：边数+双色
+        function getRandomMeteorStyle(){
+            const sides = Math.floor(Math.random() * 5) + 5;
+            const r1 = Math.floor(Math.random()*256), g1 = Math.floor(Math.random()*256), b1 = Math.floor(Math.random()*256);
+            const r2 = Math.floor(Math.random()*256), g2 = Math.floor(Math.random()*256), b2 = Math.floor(Math.random()*256);
+            return {sides, c1:`rgb(${r1},${g1},${b1})`, c2:`rgb(${r2},${g2},${b2})`};
+        }
+
+        // 绘制不规则陨石（宝库/预览/游戏共用一套绘制逻辑，保证完全一致）
+        function drawMeteor(ctx, x, y, radius, style, rotate = 0){
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotate);
+            ctx.beginPath();
+            const side = style.sides;
+            for(let i = 0; i < side; i++){
+                const angle = (Math.PI * 2 / side) * i;
+                const currR = radius * (0.7 + Math.sin(rotate + i) * 0.3);
+                const px = Math.cos(angle) * currR;
+                const py = Math.sin(angle) * currR;
+                i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            const grad = ctx.createRadialGradient(0,0,0,0,0,radius);
+            grad.addColorStop(0, style.c1);
+            grad.addColorStop(1, style.c2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 画布适配
+        function resizeCanvas(){
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            previewCanvas.width = 400;
+            previewCanvas.height = 400;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // 全屏切换
+        function toggleFullScreen(){
+            const doc = document.documentElement;
+            const full = document.fullscreenElement || document.webkitFullscreenElement;
+            full ? (document.exitFullscreen || document.webkitExitFullscreen)()
+                 : (doc.requestFullscreen || doc.webkitRequestFullscreen)();
+        }
+        fullscreenBtn.addEventListener('click', toggleFullScreen);
+
+        // 首次点击初始化
+        function firstTouchInit(e){
+            if(firstClickDone) return;
+            firstClickDone = true;
+            e.preventDefault();
+            toggleFullScreen();
+            initGame();
+        }
+        window.addEventListener('mousedown', firstTouchInit, {once:true});
+        window.addEventListener('touchstart', firstTouchInit, {once:true});
+
+        function updateTopLevel(lv){ topLevel.innerText = lv; }
+
+        // 宝库列数切换
+        viewBtns.forEach(btn=>{
+            btn.addEventListener('click',()=>{
+                viewBtns.forEach(b=>b.classList.remove('active'));
+                btn.classList.add('active');
+                currentViewCol = +btn.dataset.col;
+                gemList.className = `gem-list gem-col-${currentViewCol}`;
+            });
+        });
+
+        // 渲染宝库（1:1还原陨石）
+        function renderGemList(){
+            gemList.innerHTML = '';
+            lootArr.forEach(style=>{
+                const item = document.createElement('div');
+                item.className = 'gem-item';
+                const c = document.createElement('canvas');
+                c.width = 100; c.height = 100;
+                const gctx = c.getContext('2d');
+                drawMeteor(gctx, 50, 50, 42, style, 0);
+                item.appendChild(c);
+                item.dataset.gem = JSON.stringify(style);
+                item.addEventListener('click',()=>openGemPreview(style));
+                gemList.appendChild(item);
+            });
+        }
+
+        // 宝石预览旋转
+        function openGemPreview(style){
+            previewGemData = style;
+            gemPreview.classList.add('show');
+            const start = Date.now();
+            function rotate(){
+                const dur = Date.now() - start;
+                const rot = (dur / previewRotateTime) * Math.PI * 2;
+                preCtx.clearRect(0,0,400,400);
+                drawMeteor(preCtx, 200, 200, 130, style, rot);
+                if(dur < previewRotateTime) requestAnimationFrame(rotate);
+            }
+            rotate();
+        }
+        gemPreview.addEventListener('click',e=>{
+            if(e.target === gemPreview) gemPreview.classList.remove('show');
+        });
+
+        // 保存图片
+        saveGemBtn.addEventListener('click',()=>{
+            if(!previewGemData) return;
+            const temp = document.createElement('canvas');
+            const tctx = temp.getContext('2d');
+            const W = 480, H = 640;
+            temp.width = W; temp.height = H;
+            tctx.fillStyle = '#000';
+            tctx.fillRect(0,0,W,H);
+            tctx.fillStyle = '#fff';
+            tctx.font = "bold 22px sans-serif";
+            tctx.textAlign = "center";
+            tctx.fillText(GAME_NAME, W/2, 60);
+            drawMeteor(tctx, W/2, H/2-40, 145, previewGemData, 0);
+            tctx.font = "18px sans-serif";
+            tctx.fillText(GAME_URL, W/2, H-40);
+            const a = document.createElement('a');
+            a.download = "陨石_"+Date.now()+".png";
+            a.href = temp.toDataURL("image/png");
+            a.click();
+        });
+
+        // 导航面板切换
+        navItems.forEach(item=>{
+            item.addEventListener('click',()=>{
+                const p = document.getElementById(item.dataset.panel);
+                panels.forEach(x=>x.classList.remove('show'));
+                navItems.forEach(x=>x.classList.remove('active'));
+                if(p) p.classList.toggle('show');
+                item.classList.toggle('active');
+            });
+        });
+        document.addEventListener('click',e=>{
+            if(!e.target.closest('.nav-bar') && !e.target.closest('.panel')){
+                panels.forEach(x=>x.classList.remove('show'));
+                navItems.forEach(x=>x.classList.remove('active'));
+            }
+        });
+
+        function initColorPanel(){
+            colorList.innerHTML = '';
+            colorThemes.forEach((t,i)=>{
+                const div = document.createElement('div');
+                div.className = 'color-item' + (i===currentTheme?' selected':'');
+                div.style.background = `linear-gradient(45deg,${t.main},${t.sub})`;
+                div.onclick = ()=>{currentTheme = i; initColorPanel();};
+                colorList.appendChild(div);
+            });
+        }
+        function renderLevelList(){
+            levelList.innerHTML = '';
+            for(let i=1;i<=MAX_LEVEL;i++){
+                const div = document.createElement('div');
+                div.className = 'level-item ' + (i<=maxUnlockedLevel?'level-pass':'level-lock');
+                div.innerText = i;
+                if(i<=maxUnlockedLevel){
+                    div.onclick = ()=>{
+                        if(gameStart){
+                            currentLevel = i;
+                            createLevel(currentLevel);
+                            panels.forEach(p=>p.classList.remove('show'));
+                        }
+                    };
+                }
+                levelList.appendChild(div);
+            }
+        }
+        function renderDots(total, done){
+            dotContainer.innerHTML = '';
+            for(let i=0;i<total;i++){
+                const d = document.createElement('div');
+                d.className = 'dot' + (i<done?' done':'');
+                dotContainer.appendChild(d);
+            }
+        }
+        function addLoot(style){ lootArr.push(style); renderGemList(); }
+
+        // 音频
+        function initAudio(){
+            if(audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            bgmGain = audioCtx.createGain();
+            sfxGain = audioCtx.createGain();
+            bgmGain.gain.value = bgmVol.value/100;
+            sfxGain.gain.value = sfxVol.value/100;
+            bgmGain.connect(audioCtx.destination);
+            sfxGain.connect(audioCtx.destination);
+        }
+        function setVolume(){
+            if(!audioCtx) return;
+            const bg = isMute ? 0 : bgmVol.value/100;
+            const sf = isMute ? 0 : sfxVol.value/100;
+            bgmGain.gain.value = bg;
+            sfxGain.gain.value = sf;
+        }
+        bgmVol.addEventListener('input', setVolume);
+        sfxVol.addEventListener('input', setVolume);
+        muteAll.addEventListener('click',()=>{
+            isMute = !isMute;
+            muteAll.innerText = isMute ? '取消静音' : '全局静音';
+            setVolume();
+        });
+        function playPianoNote(freq, time=0, dur=1.2){
+            if(isMute || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(sfxGain);
+            osc.type = 'sine'; osc.frequency.value = freq;
+            const now = audioCtx.currentTime + time;
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.35, now+0.005);
+            gain.gain.linearRampToValueAtTime(0.001, now+dur);
+            osc.start(now); osc.stop(now+dur+0.05);
+        }
+        function stopBGM(){ if(bgmTimer) clearTimeout(bgmTimer); bgmTimer = null; }
+        function playPianoBGM(level){
+            if(isMute || !audioCtx) return;
+            stopBGM();
+            const mel = pianoMelodies[(level-1)%pianoMelodies.length];
+            const beat = 0.2;
+            function loop(){
+                if(!gameStart || isLevelPass) return;
+                mel.forEach((f,i)=>playPianoNote(f, i*beat, 0.75));
+                bgmTimer = setTimeout(loop, mel.length*beat*1000);
+            }
+            loop();
+        }
+        function playHitSfx(lv){ playPianoNote(523 + lv*30, 0, 0.35); }
+
+        // 粒子类
+        class Particle{
+            constructor(x,y){
+                this.x = x; this.y = y;
+                const ang = Math.random()*Math.PI*2;
+                const spd = 2 + Math.random()*4;
+                this.vx = Math.cos(ang)*spd;
+                this.vy = Math.sin(ang)*spd;
+                this.r = 2 + Math.random()*4;
+                this.life = 100;
+                const t = colorThemes[currentTheme];
+                this.color = Math.random()>0.5 ? t.main : t.sub;
+            }
+            update(){
+                this.x += this.vx; this.y += this.vy;
+                this.vy += 0.02;
+                this.life--;
+                return this.life > 0;
+            }
+            draw(){
+                ctx.beginPath();
+                ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = this.color;
+                ctx.fill();
+            }
+        }
+
+        // 陨石类
+        class Meteor{
+            constructor(x,y){
+                this.x = x; this.y = y;
+                this.r = 24;
+                this.active = true;
+                this.ang = 0;
+                this.style = getRandomMeteorStyle();
+                this.data = this.style;
+            }
+            update(){ this.ang += 0.03; }
+            draw(){
+                if(!this.active) return;
+                drawMeteor(ctx, this.x, this.y, this.r, this.style, this.ang);
+            }
+            checkHit(px,py){
+                return Math.hypot(px-this.x, py-this.y) < this.r;
+            }
+        }
+
+        // 创建关卡
+        function createLevel(lv){
+            targets = []; particles = []; isLevelPass = false;
+            const count = Math.min(6 + Math.floor(lv*1.8), 60);
+            const pad = 70;
+            for(let i=0;i<count;i++){
+                const x = pad + Math.random()*(canvas.width - pad*2);
+                const y = 100 + Math.random()*(canvas.height - pad*2 - 160);
+                targets.push(new Meteor(x,y));
+            }
+            currentLevel = lv;
+            updateTopLevel(lv);
+            renderDots(count, 0);
+            playPianoBGM(lv);
+        }
+
+        function spawnParticles(x,y){
+            if(isLevelPass) return;
+            for(let i=0;i<12;i++) particles.push(new Particle(x,y));
+        }
+
+        // 初始化游戏
+        function initGame(){
+            initAudio(); initColorPanel(); renderLevelList(); renderGemList();
+            gameStart = true; currentLevel = 1; maxUnlockedLevel = 1;
+            updateTopLevel(1);
+            createLevel(1);
+            animate();
+        }
+
+        // 点击/触摸
+        function getPos(e){
+            const t = e.touches ? e.touches[0] : e;
+            return {x:t.clientX, y:t.clientY};
+        }
+        window.addEventListener('mousedown',e=>{
+            if(!gameStart) return;
+            const p = getPos(e);
+            spawnParticles(p.x,p.y);
+        });
+        window.addEventListener('touchstart',e=>{
+            if(!gameStart) return;
+            e.preventDefault();
+            const p = getPos(e);
+            spawnParticles(p.x,p.y);
+        });
+
+        // 主循环
+        function animate(){
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.shadowBlur = 0;
+
+            let allClear = true;
+            let doneCount = 0;
+            targets.forEach(t=>{
+                t.update(); t.draw();
+                if(t.active) allClear = false;
+                else doneCount++;
+            });
+            renderDots(targets.length, doneCount);
+
+            particles = particles.filter(p=>{
+                const alive = p.update();
+                if(!alive) return false;
+                p.draw();
+                targets.forEach(t=>{
+                    if(t.active && t.checkHit(p.x,p.y)){
+                        t.active = false;
+                        playHitSfx(currentLevel);
+                        addLoot(t.data);
+                    }
+                });
+                return true;
+            });
+
+            if(allClear && gameStart && !isLevelPass){
+                isLevelPass = true; stopBGM();
+                if(currentLevel >= maxUnlockedLevel && currentLevel < MAX_LEVEL){
+                    maxUnlockedLevel = currentLevel + 1;
+                    renderLevelList();
+                }
+                setTimeout(()=>{
+                    currentLevel++;
+                    if(currentLevel <= MAX_LEVEL) createLevel(currentLevel);
+                },1200);
+            }
+            requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+</html>

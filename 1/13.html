@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>幻境灵域 · 星尘之旅 | 艺术闯关</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #0a0f1e;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            font-family: 'Segoe UI', 'Poppins', 'Courier New', monospace;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #1a1f2e, #0b0e16);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            cursor: pointer;
+        }
+
+        .game-ui {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 20px 20px 20px;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .info-panel {
+            background: rgba(10, 20, 30, 0.75);
+            backdrop-filter: blur(16px);
+            border-radius: 60px;
+            padding: 10px 22px;
+            color: #f5eedc;
+            font-weight: bold;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            border: 1px solid rgba(255, 215, 150, 0.8);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+            pointer-events: none;
+            font-family: monospace;
+        }
+
+        .controls {
+            pointer-events: auto;
+            display: flex;
+            gap: 18px;
+        }
+
+        button {
+            background: rgba(25, 35, 55, 0.85);
+            backdrop-filter: blur(12px);
+            border: none;
+            color: #ffecb3;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 8px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            font-family: monospace;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255, 200, 100, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.94);
+            background: rgba(80, 110, 150, 0.9);
+        }
+
+        .message-area {
+            position: absolute;
+            top: 28%;
+            left: 0;
+            right: 0;
+            text-align: center;
+            pointer-events: none;
+            z-index: 30;
+            font-size: 2rem;
+            font-weight: bold;
+            text-shadow: 0 0 20px #ffaa44, 0 0 8px #000;
+            color: #fff7e6;
+            background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent);
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .guide-tip {
+            position: absolute;
+            top: 15px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            pointer-events: none;
+            z-index: 25;
+            font-size: 0.8rem;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(4px);
+            display: inline-block;
+            width: fit-content;
+            margin: 0 auto;
+            padding: 6px 18px;
+            border-radius: 40px;
+            color: #ffdfb3;
+            font-family: monospace;
+            font-weight: bold;
+            border: 1px solid rgba(255,215,0,0.4);
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }
+
+        @media (max-width: 700px) {
+            .info-panel { font-size: 0.7rem; padding: 6px 14px; }
+            button { padding: 6px 14px; font-size: 0.9rem; }
+            .message-area { font-size: 1.4rem; top: 22%; }
+            .guide-tip { font-size: 0.6rem; top: 8px; white-space: nowrap; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container" id="gameContainer">
+    <canvas id="gameCanvas" width="1200" height="800"></canvas>
+    <div class="guide-tip">✨ 拖拽灵光球 · 收集所有星尘 ✨ 抵达辉光之门 ✨</div>
+    <div class="game-ui">
+        <div class="info-panel" id="levelInfo">✨ 灵韵之境 · 星尘 0/0 ✨</div>
+        <div class="controls">
+            <button id="fullscreenBtn" aria-label="全屏沉浸">⛶ 全屏</button>
+            <button id="resetBtn" class="reset-btn">🌀 重奏</button>
+        </div>
+    </div>
+    <div id="messageOverlay" class="message-area"></div>
+</div>
+
+<script>
+    (function(){
+        // ========= 艺术闯关核心 · 元素远离边缘 + 视觉华丽增强 =========
+        // 全局边缘留白距离（确保小球、收集品、终点都不贴着屏幕边缘）
+        const EDGE_PADDING = 48;  // 像素留白，保证任何分辨率下都有舒适空间
+        
+        // 每一关独立艺术风格，所有预设坐标会在加载时根据实际画布重新映射并避开边缘
+        const LEVELS = [
+            {   
+                name: "🌿 翠梦林地",
+                bgTop: "#1f4f2b",
+                bgBottom: "#0c2e1a",
+                playerColor: "#f9e6b3",
+                glowColor: "#e8ffb0",
+                obstacleColor: "#7a5a3c",
+                goalColor: "#ffdf80",
+                particleHue: 95,
+                playerRad: 18,
+                goalRad: 18,
+                // 相对坐标归一化 (0-1范围) 避免硬编码屏幕边缘，在加载时换算成真实坐标并考虑留白
+                obstacles_rel: [[0.35, 0.32, 0.05, 0.04], [0.62, 0.60, 0.04, 0.045], [0.23, 0.70, 0.045, 0.035], [0.82, 0.45, 0.04, 0.045]],
+                collectibles_rel: [[0.15, 0.25, 14], [0.74, 0.15, 14], [0.36, 0.77, 14], [0.48, 0.55, 14], [0.88, 0.68, 14], [0.25, 0.44, 14], [0.66, 0.86, 14]],
+                startPos_rel: [0.08, 0.88],
+                goalPos_rel: [0.92, 0.12],
+                bgmTheme: "forest"
+            },
+            {   
+                name: "🌌 星砂夜曲",
+                bgTop: "#1e1b48",
+                bgBottom: "#0a0826",
+                playerColor: "#d9f0ff",
+                glowColor: "#c0e0ff",
+                obstacleColor: "#5d4680",
+                goalColor: "#f3b3ff",
+                particleHue: 260,
+                playerRad: 17,
+                goalRad: 18,
+                obstacles_rel: [[0.32, 0.23, 0.045, 0.24], [0.65, 0.67, 0.2, 0.04], [0.48, 0.42, 0.04, 0.19], [0.21, 0.56, 0.04, 0.045], [0.78, 0.32, 0.045, 0.05]],
+                collectibles_rel: [[0.11, 0.58, 13], [0.51, 0.22, 13], [0.75, 0.78, 13], [0.33, 0.63, 13], [0.86, 0.49, 13], [0.40, 0.89, 13], [0.61, 0.34, 13], [0.19, 0.18, 13]],
+                startPos_rel: [0.07, 0.90],
+                goalPos_rel: [0.93, 0.82],
+                bgmTheme: "starry"
+            },
+            {   
+                name: "🔥 赤红幻界",
+                bgTop: "#7a2e1a",
+                bgBottom: "#3a1208",
+                playerColor: "#ffcf8a",
+                glowColor: "#ffab5e",
+                obstacleColor: "#b5542c",
+                goalColor: "#ffbb66",
+                particleHue: 25,
+                playerRad: 20,
+                goalRad: 19,
+                obstacles_rel: [[0.26, 0.51, 0.27, 0.035], [0.71, 0.32, 0.035, 0.33], [0.43, 0.16, 0.04, 0.25], [0.14, 0.36, 0.03, 0.19], [0.83, 0.59, 0.045, 0.045]],
+                collectibles_rel: [[0.13, 0.66, 15], [0.85, 0.27, 15], [0.52, 0.47, 15], [0.32, 0.29, 15], [0.74, 0.81, 15], [0.45, 0.75, 15], [0.92, 0.14, 15], [0.24, 0.12, 15]],
+                startPos_rel: [0.06, 0.92],
+                goalPos_rel: [0.94, 0.16],
+                bgmTheme: "embers"
+            }
+        ];
+
+        // 游戏状态
+        let currentLevel = 0;
+        let gameRunning = true;
+        let winFlag = false;
+        let player = { x: 0, y: 0, radius: 18 };
+        let goal = { x: 0, y: 0, radius: 18 };
+        let obstacles = [];
+        let collectibles = [];
+        let collectedCount = 0;
+        let totalCollectibles = 0;
+        
+        // 交互目标
+        let targetX = null, targetY = null;
+        let canvas = document.getElementById('gameCanvas');
+        let ctx = canvas.getContext('2d');
+        let container = document.getElementById('gameContainer');
+        let levelInfoDiv = document.getElementById('levelInfo');
+        let messageDiv = document.getElementById('messageOverlay');
+        
+        // 粒子系统
+        let particles = [];
+        
+        // 音频系统
+        let audioCtx = null;
+        let bgmInterval = null;
+        let bgmPlaying = false;
+        let audioUnlocked = false;
+        
+        // 获取安全边界（强制留白EDGE_PADDING，且考虑物体半径，物体绝不会靠近边缘）
+        function getSafeBounds(rad = 0) {
+            // 边缘留白基础值 + 物体半径确保不会视觉上贴边
+            let minX = EDGE_PADDING + rad;
+            let minY = EDGE_PADDING + rad;
+            let maxX = canvas.width - EDGE_PADDING - rad;
+            let maxY = canvas.height - EDGE_PADDING - rad;
+            // 防止极端情况负值
+            if (maxX < minX) { minX = rad + 5; maxX = canvas.width - rad - 5; }
+            if (maxY < minY) { minY = rad + 5; maxY = canvas.height - rad - 5; }
+            return { minX, minY, maxX, maxY };
+        }
+        
+        // 音效
+        function playSound(type) {
+            if(!audioCtx || !audioUnlocked) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.22, now);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now+0.45);
+                if(type === 'collect'){
+                    osc.frequency.value = 880;
+                    osc.frequency.exponentialRampToValueAtTime(1320, now+0.12);
+                    gain.gain.setValueAtTime(0.18, now);
+                } else if(type === 'win'){
+                    osc.frequency.value = 523.25;
+                    osc.frequency.exponentialRampToValueAtTime(1046.5, now+0.28);
+                    gain.gain.setValueAtTime(0.28, now);
+                } else if(type === 'hit'){
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = 180;
+                    osc.frequency.exponentialRampToValueAtTime(90, now+0.2);
+                    gain.gain.setValueAtTime(0.2, now);
+                } else if(type === 'levelup'){
+                    osc.frequency.value = 659.25;
+                    osc.frequency.exponentialRampToValueAtTime(880, now+0.2);
+                    gain.gain.setValueAtTime(0.2, now);
+                }
+                osc.start();
+                osc.stop(now+0.5);
+            } catch(e) {}
+        }
+        
+        function stopBgm() {
+            if(bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; }
+            bgmPlaying = false;
+        }
+        
+        function startBgmForLevel(levelIdx) {
+            if(!audioCtx || !audioUnlocked) return;
+            stopBgm();
+            const lvl = LEVELS[levelIdx];
+            let baseFreq = 300;
+            let pattern = [0, 2, 3, 5, 7, 8, 10];
+            let intervalMs = 580;
+            if(lvl.bgmTheme === 'forest') { baseFreq = 294; pattern = [0,2,4,7,9]; intervalMs = 620; }
+            if(lvl.bgmTheme === 'starry') { baseFreq = 262; pattern = [0,3,5,7,10,12]; intervalMs = 540; }
+            if(lvl.bgmTheme === 'embers') { baseFreq = 349; pattern = [0,1,4,6,8]; intervalMs = 500; }
+            let step = 0;
+            bgmInterval = setInterval(() => {
+                if(!audioCtx || !bgmPlaying || !audioUnlocked) return;
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                let pitch = baseFreq * Math.pow(2, pattern[step % pattern.length] / 12);
+                if(lvl.bgmTheme === 'embers') pitch *= 1.05;
+                osc.frequency.value = pitch;
+                osc.type = 'triangle';
+                gainNode.gain.setValueAtTime(0.09, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, now+0.4);
+                osc.start();
+                osc.stop(now+0.38);
+                step++;
+            }, intervalMs);
+            bgmPlaying = true;
+        }
+        
+        // 碰撞检测
+        function collideRectCircle(rx, ry, rw, rh, cx, cy, rad) {
+            let closestX = Math.max(rx, Math.min(cx, rx+rw));
+            let closestY = Math.max(ry, Math.min(cy, ry+rh));
+            let dx = cx - closestX;
+            let dy = cy - closestY;
+            return (dx*dx + dy*dy) < rad*rad;
+        }
+        
+        // 从相对坐标转换为绝对坐标（并强制加入边缘留白限制）
+        function relToAbs(relX, relY, rad = 0) {
+            const safe = getSafeBounds(rad);
+            const rangeX = safe.maxX - safe.minX;
+            const rangeY = safe.maxY - safe.minY;
+            let absX = safe.minX + relX * rangeX;
+            let absY = safe.minY + relY * rangeY;
+            // 最终钳制确保万无一失
+            absX = Math.min(safe.maxX, Math.max(safe.minX, absX));
+            absY = Math.min(safe.maxY, Math.max(safe.minY, absY));
+            return { x: absX, y: absY };
+        }
+        
+        // 生成粒子背景
+        function generateParticleField(baseHue) {
+            particles = [];
+            for(let i=0; i<150; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: 2 + Math.random() * 7,
+                    speedX: (Math.random() - 0.5) * 0.45,
+                    speedY: (Math.random() - 0.5) * 0.4,
+                    alpha: 0.3 + Math.random() * 0.6,
+                    hue: (baseHue + (Math.random() * 50) - 25) % 360,
+                });
+            }
+        }
+        
+        function updateParticles() {
+            for(let p of particles) {
+                p.x += p.speedX;
+                p.y += p.speedY;
+                if(p.x < -30) p.x = canvas.width + 20;
+                if(p.x > canvas.width+30) p.x = -20;
+                if(p.y < -30) p.y = canvas.height + 20;
+                if(p.y > canvas.height+30) p.y = -20;
+                p.alpha = 0.4 + Math.sin(Date.now() * 0.003 * p.size) * 0.25;
+            }
+        }
+        
+        // 加载关卡 (基于画布实时尺寸 + 边缘留白重新映射所有元素)
+        function loadLevel(levelIdx) {
+            const lvl = LEVELS[levelIdx];
+            if(!lvl) return false;
+            winFlag = false;
+            gameRunning = true;
+            player.radius = lvl.playerRad;
+            goal.radius = lvl.goalRad;
+            
+            // 重新计算玩家和终点安全位置（基于相对坐标+留白）
+            const startAbs = relToAbs(lvl.startPos_rel[0], lvl.startPos_rel[1], player.radius);
+            player.x = startAbs.x;
+            player.y = startAbs.y;
+            const goalAbs = relToAbs(lvl.goalPos_rel[0], lvl.goalPos_rel[1], goal.radius);
+            goal.x = goalAbs.x;
+            goal.y = goalAbs.y;
+            
+            // 障碍物转换（相对坐标 -> 绝对坐标 + 宽高按比例缩放）
+            obstacles = [];
+            for(let obsRel of lvl.obstacles_rel) {
+                const safeArea = getSafeBounds(0);
+                const wRel = obsRel[2];
+                const hRel = obsRel[3];
+                const rangeX = safeArea.maxX - safeArea.minX;
+                const rangeY = safeArea.maxY - safeArea.minY;
+                let absX = safeArea.minX + obsRel[0] * rangeX;
+                let absY = safeArea.minY + obsRel[1] * rangeY;
+                let absW = wRel * rangeX;
+                let absH = hRel * rangeY;
+                // 确保障碍物不完全遮挡边缘留白区 (无额外动作，但视觉上障碍物已自动在留白内部)
+                obstacles.push({ x: absX, y: absY, w: absW, h: absH });
+            }
+            
+            // 收集品转换 (每个星尘独立半径，且远离边缘)
+            collectibles = [];
+            for(let cRel of lvl.collectibles_rel) {
+                let coinRad = cRel[2] || 13;
+                const coinPos = relToAbs(cRel[0], cRel[1], coinRad);
+                collectibles.push({ x: coinPos.x, y: coinPos.y, r: coinRad, collected: false });
+            }
+            
+            totalCollectibles = collectibles.length;
+            collectedCount = 0;
+            levelInfoDiv.innerHTML = `✨ ${lvl.name} · 星尘 ${collectedCount}/${totalCollectibles} ✨`;
+            hideMessage();
+            if(audioUnlocked && audioCtx) startBgmForLevel(levelIdx);
+            generateParticleField(lvl.particleHue);
+            // 二次绝对安全钳制
+            const boundsPlayer = getSafeBounds(player.radius);
+            player.x = Math.min(boundsPlayer.maxX, Math.max(boundsPlayer.minX, player.x));
+            player.y = Math.min(boundsPlayer.maxY, Math.max(boundsPlayer.minY, player.y));
+            const boundsGoal = getSafeBounds(goal.radius);
+            goal.x = Math.min(boundsGoal.maxX, Math.max(boundsGoal.minX, goal.x));
+            goal.y = Math.min(boundsGoal.maxY, Math.max(boundsGoal.minY, goal.y));
+            
+            drawCanvas();
+            return true;
+        }
+        
+        // 更新移动 + 收集 + 胜利判定
+        function updateMovement() {
+            if(!gameRunning || winFlag) return;
+            if(targetX !== null && targetY !== null) {
+                let dx = targetX - player.x;
+                let dy = targetY - player.y;
+                let dist = Math.hypot(dx, dy);
+                let speed = 7.2;
+                if(dist > 1) {
+                    let move = Math.min(speed, dist);
+                    let stepX = (dx / dist) * move;
+                    let stepY = (dy / dist) * move;
+                    let newX = player.x + stepX;
+                    let newY = player.y + stepY;
+                    const bounds = getSafeBounds(player.radius);
+                    newX = Math.min(bounds.maxX, Math.max(bounds.minX, newX));
+                    newY = Math.min(bounds.maxY, Math.max(bounds.minY, newY));
+                    let collide = false;
+                    for(let obs of obstacles) {
+                        if(collideRectCircle(obs.x, obs.y, obs.w, obs.h, newX, newY, player.radius)) {
+                            collide = true;
+                            playSound('hit');
+                            break;
+                        }
+                    }
+                    if(!collide) {
+                        player.x = newX;
+                        player.y = newY;
+                    }
+                } else {
+                    player.x = targetX;
+                    player.y = targetY;
+                    const boundsFinal = getSafeBounds(player.radius);
+                    player.x = Math.min(boundsFinal.maxX, Math.max(boundsFinal.minX, player.x));
+                    player.y = Math.min(boundsFinal.maxY, Math.max(boundsFinal.minY, player.y));
+                }
+            }
+            
+            // 收集星尘
+            for(let i=0; i<collectibles.length; i++) {
+                let c = collectibles[i];
+                if(!c.collected && Math.hypot(player.x - c.x, player.y - c.y) < player.radius + c.r) {
+                    c.collected = true;
+                    collectedCount++;
+                    playSound('collect');
+                    levelInfoDiv.innerHTML = `✨ ${LEVELS[currentLevel].name} · 星尘 ${collectedCount}/${totalCollectibles} ✨`;
+                    for(let s=0; s<14; s++) {
+                        particles.push({
+                            x: c.x, y: c.y, size: 2+Math.random()*6,
+                            speedX: (Math.random()-0.5)*4, speedY: (Math.random()-0.5)*4,
+                            alpha: 0.9, hue: (LEVELS[currentLevel].particleHue + 45) % 360
+                        });
+                    }
+                }
+            }
+            
+            let allCollected = (collectedCount === totalCollectibles);
+            let goalDist = Math.hypot(player.x - goal.x, player.y - goal.y);
+            if(!winFlag && allCollected && goalDist < player.radius + goal.radius) {
+                winFlag = true;
+                gameRunning = false;
+                playSound('win');
+                showMessage("✨ 灵韵相映 · 秘境开启 ✨", 1800);
+                if(currentLevel + 1 < LEVELS.length) {
+                    setTimeout(() => {
+                        currentLevel++;
+                        loadLevel(currentLevel);
+                    }, 1600);
+                } else {
+                    showMessage("🏆 永恒艺术 · 完美归途 🏆", 3000);
+                    setTimeout(() => {
+                        currentLevel = 0;
+                        loadLevel(0);
+                    }, 3800);
+                }
+                drawCanvas();
+                return;
+            }
+            updateParticles();
+            drawCanvas();
+        }
+        
+        // 华丽渲染
+        function drawCanvas() {
+            if(!ctx) return;
+            const lvl = LEVELS[currentLevel];
+            const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            grad.addColorStop(0, lvl.bgTop);
+            grad.addColorStop(1, lvl.bgBottom);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            for(let p of particles) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI*2);
+                ctx.fillStyle = `hsla(${p.hue}, 85%, 68%, ${p.alpha * 0.55})`;
+                ctx.fill();
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = `hsl(${p.hue}, 80%, 70%)`;
+            }
+            ctx.shadowBlur = 0;
+            
+            for(let obs of obstacles) {
+                ctx.fillStyle = lvl.obstacleColor;
+                ctx.shadowBlur = 4;
+                ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+                ctx.fillStyle = "rgba(255,215,150,0.25)";
+                ctx.fillRect(obs.x+3, obs.y+3, obs.w-6, obs.h-6);
+                ctx.fillStyle = "rgba(0,0,0,0.2)";
+                ctx.fillRect(obs.x+1, obs.y+1, obs.w-2, obs.h-2);
+            }
+            
+            for(let coin of collectibles) {
+                if(!coin.collected) {
+                    ctx.beginPath();
+                    ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI*2);
+                    ctx.fillStyle = "#ffdc7a";
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = "#ffb347";
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(coin.x, coin.y, coin.r-4, 0, Math.PI*2);
+                    ctx.fillStyle = "#fff0bb";
+                    ctx.fill();
+                    ctx.fillStyle = "#ffaa55";
+                    ctx.font = `${Math.floor(coin.r)}px monospace`;
+                    ctx.fillText("✨", coin.x-6, coin.y+5);
+                }
+            }
+            
+            ctx.shadowBlur = 18;
+            ctx.beginPath();
+            ctx.arc(goal.x, goal.y, goal.radius+7, 0, Math.PI*2);
+            ctx.fillStyle = lvl.goalColor + "cc";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(goal.x, goal.y, goal.radius+2, 0, Math.PI*2);
+            ctx.fillStyle = "#fffbc2";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(goal.x, goal.y, goal.radius-3, 0, Math.PI*2);
+            ctx.fillStyle = "#f5c542";
+            ctx.fill();
+            ctx.fillStyle = "#fff0c0";
+            ctx.font = `bold ${Math.floor(goal.radius+5)}px monospace`;
+            ctx.fillText("⛩️", goal.x-13, goal.y+9);
+            
+            ctx.shadowBlur = 22;
+            ctx.shadowColor = lvl.glowColor;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius-2, 0, Math.PI*2);
+            ctx.fillStyle = lvl.playerColor;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius-6, 0, Math.PI*2);
+            ctx.fillStyle = "#fff9e0";
+            ctx.fill();
+            ctx.fillStyle = "#4a2a1a";
+            ctx.beginPath();
+            ctx.arc(player.x-6, player.y-5, 3, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(player.x+6, player.y-5, 3, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            ctx.arc(player.x-7, player.y-6, 1.2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(player.x+5, player.y-6, 1.2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#ffb6b6";
+            ctx.beginPath();
+            ctx.ellipse(player.x-9, player.y+2, 3, 2, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(player.x+9, player.y+2, 3, 2, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            if(totalCollectibles > 0 && collectedCount < totalCollectibles) {
+                let nearest = null;
+                let minD = Infinity;
+                for(let c of collectibles) {
+                    if(!c.collected) {
+                        let d2 = Math.hypot(player.x - c.x, player.y - c.y);
+                        if(d2 < minD) { minD = d2; nearest = c; }
+                    }
+                }
+                if(nearest) {
+                    ctx.beginPath();
+                    ctx.moveTo(player.x, player.y);
+                    ctx.lineTo(nearest.x, nearest.y);
+                    ctx.strokeStyle = "rgba(255,225,140,0.55)";
+                    ctx.lineWidth = 2.2;
+                    ctx.setLineDash([7, 12]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+            ctx.shadowBlur = 0;
+        }
+        
+        function showMessage(msg, duration=1500) {
+            messageDiv.innerText = msg;
+            messageDiv.style.opacity = "1";
+            setTimeout(()=>{ messageDiv.style.opacity = "0"; }, duration);
+        }
+        function hideMessage() { messageDiv.style.opacity = "0"; }
+        
+        function resetLevel() {
+            stopBgm();
+            loadLevel(currentLevel);
+            if(audioUnlocked && audioCtx) startBgmForLevel(currentLevel);
+            targetX = player.x;
+            targetY = player.y;
+            drawCanvas();
+        }
+        
+        function toggleFullscreen() {
+            let elem = document.documentElement;
+            if(!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if(elem.requestFullscreen) elem.requestFullscreen();
+                else if(elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            } else {
+                if(document.exitFullscreen) document.exitFullscreen();
+                else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        }
+        
+        function unlockAudioOnInteraction() {
+            if(audioUnlocked) return;
+            if(!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if(audioCtx.state === 'suspended') {
+                audioCtx.resume().then(()=>{
+                    audioUnlocked = true;
+                    startBgmForLevel(currentLevel);
+                }).catch(e=>console.log);
+            } else {
+                audioUnlocked = true;
+                startBgmForLevel(currentLevel);
+            }
+        }
+        
+        function handleMove(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let canvasX = (clientX - rect.left) * scaleX;
+            let canvasY = (clientY - rect.top) * scaleY;
+            const bounds = getSafeBounds(player.radius);
+            canvasX = Math.min(bounds.maxX, Math.max(bounds.minX, canvasX));
+            canvasY = Math.min(bounds.maxY, Math.max(bounds.minY, canvasY));
+            targetX = canvasX;
+            targetY = canvasY;
+        }
+        
+        function onPointerStart(e) {
+            e.preventDefault();
+            unlockAudioOnInteraction();
+            const point = e.touches ? e.touches[0] : e;
+            handleMove(point.clientX, point.clientY);
+        }
+        function onPointerMove(e) {
+            if(!gameRunning || winFlag) return;
+            e.preventDefault();
+            const point = e.touches ? e.touches[0] : e;
+            handleMove(point.clientX, point.clientY);
+        }
+        
+        function resizeCanvas() {
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            if(LEVELS[currentLevel]) {
+                loadLevel(currentLevel);  // 重新加载根据新尺寸刷新所有元素位置，保证边缘留白始终生效
+            }
+            drawCanvas();
+        }
+        
+        function gameLoop() {
+            updateMovement();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function init() {
+            resizeCanvas();
+            canvas.addEventListener('touchstart', onPointerStart, {passive:false});
+            canvas.addEventListener('touchmove', onPointerMove, {passive:false});
+            canvas.addEventListener('touchend', ()=>{});
+            canvas.addEventListener('mousedown', onPointerStart);
+            window.addEventListener('mousemove', (e)=>{ if(e.buttons === 1 && !winFlag && gameRunning) onPointerMove(e); });
+            window.addEventListener('mouseup', ()=>{});
+            window.addEventListener('resize', ()=>{ resizeCanvas(); });
+            document.getElementById('fullscreenBtn').addEventListener('click', (e)=>{ e.stopPropagation(); toggleFullscreen(); unlockAudioOnInteraction(); });
+            document.getElementById('resetBtn').addEventListener('click', (e)=>{ e.stopPropagation(); resetLevel(); });
+            gameLoop();
+        }
+        
+        init();
+    })();
+</script>
+</body>
+</html>

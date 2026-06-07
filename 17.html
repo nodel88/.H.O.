@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    <title>色彩艺术闯关 999关</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        #gameWrap {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .fullscreenBtn {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            border: 1px solid rgba(255,255,255,0.5);
+            color: #fff;
+            font-size: 22px;
+            z-index: 9999;
+            cursor: pointer;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            transition: transform 0.2s;
+        }
+        .fullscreenBtn:active {
+            transform: scale(0.92);
+            background: rgba(255,255,255,0.4);
+        }
+        .hint {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.6);
+            font-size: 13px;
+            z-index: 9998;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameWrap">
+        <canvas id="gameCanvas"></canvas>
+        <button class="fullscreenBtn" id="fsBtn">⛶</button>
+        <div class="hint">点击同色图形消除 · 全部点对过关</div>
+    </div>
+
+    <!-- 关卡独立BGM（循环） -->
+    <audio id="bgm0" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-dreamy-night-ambience-1169.mp3" type="audio/mpeg">
+    
+    <audio id="bgm1" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-soft-piano-melody-1172.mp3" type="audio/mpeg">
+    
+    <audio id="bgm2" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-relaxing-ambience-and-waves-1049.mp3" type="audio/mpeg">
+    
+    <audio id="bgm3" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-light-ambient-music-1165.mp3" type="audio/mpeg">
+    
+    <audio id="bgm4" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-echoes-and-drones-1171.mp3" type="audio/mpeg">
+    
+    <audio id="bgm5" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-calm-ambience-1209.mp3" type="audio/mpeg">
+    
+    <audio id="bgm6" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-forest-stream-ambience-1210.mp3" type="audio/mpeg">
+    
+    <audio id="bgm7" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-wind-chimes-ambience-1211.mp3" type="audio/mpeg">
+    
+    <audio id="bgm8" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-ocean-waves-ambience-1212.mp3" type="audio/mpeg">
+    
+    <audio id="bgm9" loop preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-rain-and-thunder-ambience-1213.mp3" type="audio/mpeg">
+    
+
+    <!-- 音效 -->
+    <audio id="clickSnd" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3" type="audio/mpeg">
+    
+    <audio id="successSnd" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3" type="audio/mpeg">
+    
+    <audio id="failSnd" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3" type="audio/mpeg">
+    
+
+    <script>
+        // 全屏兼容（含苹果浏览器）
+        const fsBtn = document.getElementById('fsBtn');
+        const gameWrap = document.getElementById('gameWrap');
+        fsBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (gameWrap.requestFullscreen) gameWrap.requestFullscreen();
+                else if (gameWrap.webkitRequestFullscreen) gameWrap.webkitRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        });
+
+        // 画布
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let w, h;
+        function resizeCanvas() {
+            w = window.innerWidth;
+            h = window.innerHeight;
+            canvas.width = w;
+            canvas.height = h;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // 音频
+        const bgmList = [
+            document.getElementById('bgm0'),
+            document.getElementById('bgm1'),
+            document.getElementById('bgm2'),
+            document.getElementById('bgm3'),
+            document.getElementById('bgm4'),
+            document.getElementById('bgm5'),
+            document.getElementById('bgm6'),
+            document.getElementById('bgm7'),
+            document.getElementById('bgm8'),
+            document.getElementById('bgm9')
+        ];
+        const clickSnd = document.getElementById('clickSnd');
+        const successSnd = document.getElementById('successSnd');
+        const failSnd = document.getElementById('failSnd');
+        let currentBgm = null;
+
+        function stopAllBgm() {
+            bgmList.forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+        }
+        function playBgm(idx) {
+            stopAllBgm();
+            currentBgm = bgmList[idx % bgmList.length];
+            currentBgm.volume = 0.4;
+            currentBgm.play().catch(e => {});
+        }
+        function playEffect(audio) {
+            audio.currentTime = 0;
+            audio.volume = 0.6;
+            audio.play().catch(e => {});
+        }
+
+        // 游戏数据
+        const MAX_LEVEL = 999;
+        let level = 1;
+        let targetColor = '';
+        let shapes = [];
+        let gameState = 'ready'; // ready, play, win, lose
+        const colorPool = [
+            '#FF6B6B','#4ECDC4','#45B7D1','#FFA07A','#98D8C8',
+            '#F7DC6F','#BB8FCE','#85C1E9','#F8C471','#82E0AA'
+        ];
+        const shapeTypes = ['circle','square','triangle','hexagon'];
+
+        // 初始化关卡
+        function initLevel(lv) {
+            if (lv > MAX_LEVEL) {
+                gameState = 'win';
+                return;
+            }
+            gameState = 'play';
+            shapes = [];
+            const count = 8 + lv * 2;
+            const colorIdx = Math.floor(Math.random() * colorPool.length);
+            targetColor = colorPool[colorIdx];
+            const targetNum = Math.max(3, Math.floor(count * 0.35));
+
+            for (let i = 0; i < count; i++) {
+                const isTarget = i < targetNum;
+                const color = isTarget ? targetColor : colorPool[Math.floor(Math.random() * colorPool.length)];
+                const shape = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
+                const size = Math.max(30, 50 - lv * 1);
+                const x = Math.random() * (w - size);
+                const y = Math.random() * (h - size - 80) + 40;
+                shapes.push({ x, y, size, color, shape, isTarget, alpha: 1 });
+            }
+            playBgm(lv);
+        }
+
+        // 绘制图形
+        function drawShape(s) {
+            ctx.save();
+            ctx.globalAlpha = s.alpha;
+            ctx.fillStyle = s.color;
+            ctx.translate(s.x + s.size/2, s.y + s.size/2);
+            const r = s.size / 2;
+
+            switch (s.shape) {
+                case 'circle':
+                    ctx.beginPath();
+                    ctx.arc(0,0,r,0,Math.PI*2);
+                    ctx.fill();
+                    break;
+                case 'square':
+                    ctx.fillRect(-r,-r,s.size,s.size);
+                    break;
+                case 'triangle':
+                    ctx.beginPath();
+                    ctx.moveTo(0,-r);
+                    ctx.lineTo(-r,r);
+                    ctx.lineTo(r,r);
+                    ctx.closePath();
+                    ctx.fill();
+                    break;
+                case 'hexagon':
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const ang = Math.PI/3 * i;
+                        const px = r * Math.cos(ang);
+                        const py = r * Math.sin(ang);
+                        i === 0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    break;
+            }
+            ctx.restore();
+        }
+
+        // 点击位置
+        function getPos(e) {
+            const t = e.touches ? e.touches[0] : e;
+            return { x: t.clientX, y: t.clientY };
+        }
+        function hitTest(pt, s) {
+            const cx = s.x + s.size/2;
+            const cy = s.y + s.size/2;
+            return Math.hypot(pt.x - cx, pt.y - cy) < s.size/2;
+        }
+
+        // 点击逻辑
+        function handleClick(e) {
+            if (gameState !== 'play') return;
+            e.preventDefault();
+            const pt = getPos(e);
+
+            for (let i = shapes.length - 1; i >= 0; i--) {
+                const s = shapes[i];
+                if (hitTest(pt, s)) {
+                    playEffect(clickSnd);
+                    if (s.isTarget) {
+                        s.alpha = 0;
+                        shapes.splice(i, 1);
+                        // 检查是否全部点对
+                        const leftTarget = shapes.filter(s => s.isTarget).length;
+                        if (leftTarget <= 0) {
+                            gameState = 'win';
+                            playEffect(successSnd);
+                        }
+                    } else {
+                        gameState = 'lose';
+                        playEffect(failSnd);
+                    }
+                    break;
+                }
+            }
+        }
+        canvas.addEventListener('click', handleClick);
+        canvas.addEventListener('touchstart', handleClick);
+
+        // 绘制UI
+        function drawUI() {
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 20px system-ui';
+            ctx.textAlign = 'center';
+            ctx.fillText(`第 ${level} 关 / ${MAX_LEVEL}`, w/2, 30);
+
+            const tipSize = 24;
+            ctx.fillStyle = targetColor;
+            ctx.fillRect(w/2 - tipSize/2, 40, tipSize, tipSize);
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.font = '14px system-ui';
+            ctx.fillText('点击所有同色图形', w/2, 80);
+
+            if (gameState === 'win') {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(0,0,w,h);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 36px system-ui';
+                if (level >= MAX_LEVEL) {
+                    ctx.fillText('🎉 恭喜！全部通关 🎉', w/2, h/2 - 30);
+                    ctx.font = '20px system-ui';
+                    ctx.fillText('点击画面回到第1关', w/2, h/2 + 20);
+                    canvas.onclick = () => {
+                        level = 1;
+                        initLevel(level);
+                        canvas.onclick = null;
+                    };
+                } else {
+                    ctx.fillText('闯关成功！', w/2, h/2 - 30);
+                    ctx.font = '20px system-ui';
+                    ctx.fillText('点击画面进入下一关', w/2, h/2 + 20);
+                    canvas.onclick = () => {
+                        level++;
+                        initLevel(level);
+                        canvas.onclick = null;
+                    };
+                }
+            }
+
+            if (gameState === 'lose') {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(0,0,w,h);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 36px system-ui';
+                ctx.fillText('挑战失败', w/2, h/2 - 30);
+                ctx.font = '20px system-ui';
+                ctx.fillText('点击画面重新挑战本关', w/2, h/2 + 20);
+                canvas.onclick = () => {
+                    initLevel(level);
+                    canvas.onclick = null;
+                };
+            }
+        }
+
+        // 主循环
+        function render() {
+            ctx.clearRect(0,0,w,h);
+            // 艺术渐变背景
+            const grad = ctx.createLinearGradient(0,0,w,h);
+            grad.addColorStop(0,'#1a1a2e');
+            grad.addColorStop(0.5,'#16213e');
+            grad.addColorStop(1,'#0f3460');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,w,h);
+
+            shapes.forEach(s => drawShape(s));
+            drawUI();
+            requestAnimationFrame(render);
+        }
+
+        // 启动
+        initLevel(level);
+        render();
+    </script>
+</body>
+</html>

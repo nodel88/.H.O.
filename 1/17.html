@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>艺术光影闯关 | 999关完整版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #050510;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        #gameWrap {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        /* 全屏按钮 */
+        #fullScreenBtn {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 9999;
+            padding: 10px 20px;
+            font-size: 14px;
+            color: #fff;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 30px;
+            backdrop-filter: blur(6px);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        #fullScreenBtn:active {
+            background: rgba(255,255,255,0.3);
+            transform: scale(0.96);
+        }
+        /* 游戏UI */
+        .game-ui {
+            position: absolute;
+            z-index: 100;
+            color: #fff;
+            text-align: center;
+        }
+        .level-text {
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            text-shadow: 0 0 8px #fff;
+        }
+        .count-text {
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .tip-text {
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 15px;
+            opacity: 0.8;
+        }
+        .btn-group {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+        }
+        .game-btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 25px;
+            font-size: 15px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #7b4397, #dc2430);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(220,36,48,0.4);
+            transition: 0.2s;
+        }
+        .game-btn:active {
+            transform: scale(0.95);
+        }
+        /* 弹窗 */
+        .mask {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pop-box {
+            width: 80%;
+            max-width: 320px;
+            padding: 30px 20px;
+            background: linear-gradient(145deg, #1a1a33, #2d2d55);
+            border-radius: 16px;
+            text-align: center;
+            color: #fff;
+            box-shadow: 0 0 30px rgba(150,100,255,0.3);
+        }
+        .pop-box h2 {
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+        .pop-box p {
+            margin-bottom: 25px;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+        .hide {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameWrap">
+        <button id="fullScreenBtn">全屏模式</button>
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="game-ui level-text">关卡：1 / 999</div>
+        <div class="game-ui count-text">已收集：0 / 0</div>
+        <div class="game-ui tip-text">点击收集光影圆球</div>
+        <div class="game-ui btn-group">
+            <button class="game-btn" id="restartBtn">重新开始</button>
+            <button class="game-btn" id="nextBtn" disabled>下一关</button>
+        </div>
+
+        <!-- 开始弹窗 -->
+        <div class="mask" id="startMask">
+            <div class="pop-box">
+                <h2>艺术光影闯关</h2>
+                <p>共999个关卡，点击光影圆球完成收集即可通关<br>每一关画面、音乐、难度都会变化</p>
+                <button class="game-btn" id="startGame">开始游戏</button>
+            </div>
+        </div>
+
+        <!-- 通关弹窗 -->
+        <div class="mask hide" id="winMask">
+            <div class="pop-box">
+                <h2>关卡通关！</h2>
+                <p id="winTip">继续挑战下一关</p>
+                <button class="game-btn" id="goNext">前往下一关</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 多组循环背景音乐 (循环轮换，适配999关) -->
+    <audio id="bgmGroup1" loop preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+    
+    <audio id="bgmGroup2" loop preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" type="audio/mpeg">
+    
+    <audio id="bgmGroup3" loop preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" type="audio/mpeg">
+    
+    <audio id="bgmGroup4" loop preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" type="audio/mpeg">
+    
+    <audio id="bgmGroup5" loop preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" type="audio/mpeg">
+    
+
+    <!-- 音效 -->
+    <audio id="btnSound" preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Sound-Effects-Short1.mp3" type="audio/mpeg">
+    
+    <audio id="clickBallSound" preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Sound-Effects-Short2.mp3" type="audio/mpeg">
+    
+    <audio id="winSound" preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Sound-Effects-Short3.mp3" type="audio/mpeg">
+    
+    <audio id="changeLevelSound" preload="auto">
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Sound-Effects-Short4.mp3" type="audio/mpeg">
+    
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const wrap = document.getElementById('gameWrap');
+        const fullBtn = document.getElementById('fullScreenBtn');
+        const startMask = document.getElementById('startMask');
+        const winMask = document.getElementById('winMask');
+        const startGameBtn = document.getElementById('startGame');
+        const goNextBtn = document.getElementById('goNext');
+        const restartBtn = document.getElementById('restartBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const levelText = document.querySelector('.level-text');
+        const countText = document.querySelector('.count-text');
+        const winTip = document.getElementById('winTip');
+
+        // 音频
+        const bgmList = [
+            document.getElementById('bgmGroup1'),
+            document.getElementById('bgmGroup2'),
+            document.getElementById('bgmGroup3'),
+            document.getElementById('bgmGroup4'),
+            document.getElementById('bgmGroup5')
+        ];
+        const btnSound = document.getElementById('btnSound');
+        const clickBallSound = document.getElementById('clickBallSound');
+        const winSound = document.getElementById('winSound');
+        const changeLevelSound = document.getElementById('changeLevelSound');
+
+        // 游戏配置
+        const MAX_LEVEL = 999;
+        let currentLevel = 1;
+        let gameStart = false;
+        let ballList = [];
+        let targetNum = 0;
+        let collectedNum = 0;
+
+        // 画布自适应
+        function resizeCanvas() {
+            canvas.width = wrap.clientWidth;
+            canvas.height = wrap.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 全屏兼容 苹果+PC
+        fullBtn.addEventListener('click', async () => {
+            try {
+                if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                    await wrap.webkitRequestFullscreen?.() || wrap.requestFullscreen?.();
+                    fullBtn.innerText = '退出全屏';
+                } else {
+                    document.webkitExitFullscreen?.() || document.exitFullscreen?.();
+                    fullBtn.innerText = '全屏模式';
+                }
+            } catch (e) {}
+        });
+
+        // 音效播放
+        function playBtnAudio() {
+            btnSound.currentTime = 0;
+            btnSound.play().catch(() => {});
+        }
+        function playBallClickAudio() {
+            clickBallSound.currentTime = 0;
+            clickBallSound.play().catch(() => {});
+        }
+        function playWinAudio() {
+            winSound.currentTime = 0;
+            winSound.play().catch(() => {});
+        }
+        function playChangeLevelAudio() {
+            changeLevelSound.currentTime = 0;
+            changeLevelSound.play().catch(() => {});
+        }
+
+        // 停止所有背景音乐
+        function stopAllBgm() {
+            bgmList.forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+        }
+
+        // 按关卡轮换背景音乐
+        function playLevelBgm(level) {
+            stopAllBgm();
+            const idx = (level - 1) % bgmList.length;
+            const curBgm = bgmList[idx];
+            curBgm.volume = 0.4;
+            curBgm.play().catch(() => {});
+        }
+
+        // 根据关卡生成渐变配色
+        function getLevelGradient(level) {
+            const hue1 = (level * 25) % 360;
+            const hue2 = (hue1 + 60) % 360;
+            const c1 = `hsl(${hue1}, 70%, 70%)`;
+            const c2 = `hsl(${hue2}, 70%, 60%)`;
+            return [c1, c2];
+        }
+
+        // 生成圆球，难度随关卡递增
+        function createBalls() {
+            ballList = [];
+            collectedNum = 0;
+            // 圆球数量随关卡增加，上限60个
+            targetNum = Math.min(6 + Math.floor(currentLevel / 3), 60);
+            const w = canvas.width;
+            const h = canvas.height;
+            const speedBase = Math.min(0.8 + currentLevel * 0.015, 3);
+
+            for (let i = 0; i < targetNum; i++) {
+                const r = 12 + Math.random() * 18;
+                ballList.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    radius: r,
+                    speedX: (Math.random() - 0.5) * speedBase,
+                    speedY: (Math.random() - 0.5) * speedBase,
+                    collected: false
+                });
+            }
+
+            levelText.innerText = `关卡：${currentLevel} / ${MAX_LEVEL}`;
+            countText.innerText = `已收集：${collectedNum} / ${targetNum}`;
+            nextBtn.disabled = true;
+        }
+
+        // 主绘制
+        function render() {
+            const colors = getLevelGradient(currentLevel);
+            // 艺术渐变背景
+            const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            grad.addColorStop(0, colors[0]);
+            grad.addColorStop(1, colors[1]);
+            ctx.fillStyle = grad;
+            ctx.globalAlpha = 0.18;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1;
+
+            // 绘制运动圆球
+            ballList.forEach(ball => {
+                if (ball.collected) return;
+                // 移动
+                ball.x += ball.speedX;
+                ball.y += ball.speedY;
+                // 边界反弹
+                if (ball.x < ball.radius || ball.x > canvas.width - ball.radius) ball.speedX *= -1;
+                if (ball.y < ball.radius || ball.y > canvas.height - ball.radius) ball.speedY *= -1;
+
+                // 发光圆球
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                const radialGrad = ctx.createRadialGradient(ball.x, ball.y, 0, ball.x, ball.y, ball.radius);
+                radialGrad.addColorStop(0, "rgba(255,255,255,0.9)");
+                radialGrad.addColorStop(1, colors[0]);
+                ctx.fillStyle = radialGrad;
+                ctx.shadowColor = colors[1];
+                ctx.shadowBlur = 30;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            requestAnimationFrame(render);
+        }
+
+        // 点击/触摸检测
+        function checkTouch(x, y) {
+            if (!gameStart) return;
+            let hasCollect = false;
+            ballList.forEach(ball => {
+                if (ball.collected) return;
+                const dist = Math.hypot(x - ball.x, y - ball.y);
+                if (dist < ball.radius) {
+                    ball.collected = true;
+                    collectedNum++;
+                    hasCollect = true;
+                    playBallClickAudio();
+                    countText.innerText = `已收集：${collectedNum} / ${targetNum}`;
+                }
+            });
+
+            // 通关判断
+            if (hasCollect && collectedNum >= targetNum) {
+                setTimeout(() => {
+                    playWinAudio();
+                    if (currentLevel >= MAX_LEVEL) {
+                        winTip.innerText = "恭喜通关全部999关！";
+                        goNextBtn.innerText = "重新挑战";
+                    } else {
+                        winTip.innerText = "继续挑战下一关";
+                        goNextBtn.innerText = "前往下一关";
+                    }
+                    winMask.classList.remove('hide');
+                    nextBtn.disabled = false;
+                }, 250);
+            }
+        }
+
+        // 鼠标点击
+        canvas.addEventListener('click', e => {
+            const rect = canvas.getBoundingClientRect();
+            checkTouch(e.clientX - rect.left, e.clientY - rect.top);
+        });
+
+        // 手机触摸
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const t = e.touches[0];
+            checkTouch(t.clientX - rect.left, t.clientY - rect.top);
+        });
+
+        // 开始游戏
+        startGameBtn.addEventListener('click', () => {
+            playBtnAudio();
+            startMask.classList.add('hide');
+            gameStart = true;
+            createBalls();
+            playLevelBgm(currentLevel);
+        });
+
+        // 下一关
+        goNextBtn.addEventListener('click', () => {
+            playBtnAudio();
+            winMask.classList.add('hide');
+            if (currentLevel >= MAX_LEVEL) {
+                currentLevel = 1;
+            } else {
+                currentLevel++;
+                playChangeLevelAudio();
+            }
+            createBalls();
+            playLevelBgm(currentLevel);
+        });
+
+        // 重新开始当前关卡
+        restartBtn.addEventListener('click', () => {
+            playBtnAudio();
+            createBalls();
+            playLevelBgm(currentLevel);
+        });
+
+        // 快捷下一关按钮
+        nextBtn.addEventListener('click', () => {
+            if (!nextBtn.disabled) goNextBtn.click();
+        });
+
+        // 启动渲染
+        render();
+    </script>
+</body>
+</html>

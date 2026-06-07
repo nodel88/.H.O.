@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>艺境·律动 | 钢琴艺术闯关</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a0a;
+      touch-action: manipulation;
+      font-family: 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+    }
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .ui-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      z-index: 10;
+    }
+    .info-panel {
+      pointer-events: none;
+      color: white;
+      text-shadow: 0 0 15px rgba(0,0,0,0.7);
+      font-weight: 300;
+      letter-spacing: 2px;
+      text-align: center;
+      background: rgba(20,20,30,0.5);
+      backdrop-filter: blur(12px);
+      border-radius: 60px;
+      padding: 12px 28px;
+      margin-top: 10px;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .level-badge {
+      font-size: clamp(18px, 5vw, 28px);
+      font-weight: 400;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .instruction {
+      font-size: clamp(12px, 3vw, 16px);
+      opacity: 0.9;
+    }
+    .button-group {
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      z-index: 20;
+      pointer-events: auto;
+    }
+    .fullscreen-btn, .mute-btn {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.5);
+      color: white;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+      transition: all 0.3s ease;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), rgba(0,0,0,0.5));
+      pointer-events: auto;
+    }
+    .fullscreen-btn:active, .mute-btn:active {
+      transform: scale(0.92);
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,200,0.5), rgba(0,0,0,0.7));
+    }
+    .mute-btn.muted {
+      background: radial-gradient(circle at 30% 30%, rgba(255,100,100,0.4), rgba(80,0,0,0.6));
+      border-color: rgba(255,150,150,0.7);
+    }
+    @media (max-width: 600px) {
+      .fullscreen-btn, .mute-btn {
+        width: 55px;
+        height: 55px;
+        font-size: 26px;
+      }
+      .button-group {
+        bottom: 20px;
+        right: 20px;
+        gap: 12px;
+      }
+    }
+    .restart-hint {
+      position: absolute;
+      bottom: 30px;
+      left: 30px;
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(10px);
+      padding: 8px 18px;
+      border-radius: 40px;
+      pointer-events: none;
+    }
+    .audio-prompt {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 20px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(15px);
+      padding: 15px 30px;
+      border-radius: 50px;
+      pointer-events: none;
+      z-index: 30;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      text-align: center;
+    }
+    .audio-prompt.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="artCanvas"></canvas>
+  <div class="ui-container">
+    <div class="info-panel">
+      <div class="level-badge" id="levelDisplay">🌿 第一幕 · 晨光</div>
+      <div class="instruction" id="targetDisplay">✨ 触碰流动的光点</div>
+    </div>
+    <div class="restart-hint" id="restartHint">🔄 双击画面重来</div>
+  </div>
+  <div class="button-group">
+    <button class="mute-btn" id="muteToggle" aria-label="静音切换">🔊</button>
+    <button class="fullscreen-btn" id="fullscreenToggle" aria-label="全屏模式">⛶</button>
+  </div>
+  <div class="audio-prompt" id="audioPrompt">🎹 点击屏幕聆听钢琴</div>
+
+  <script>
+    (function() {
+      // ----- 艺境·律动 | 钢琴艺术闯关游戏 (修复所有目标可消除) -----
+      const canvas = document.getElementById('artCanvas');
+      const ctx = canvas.getContext('2d');
+
+      const levelDisplay = document.getElementById('levelDisplay');
+      const targetDisplay = document.getElementById('targetDisplay');
+      const fullscreenBtn = document.getElementById('fullscreenToggle');
+      const muteBtn = document.getElementById('muteToggle');
+      const audioPrompt = document.getElementById('audioPrompt');
+
+      // 音频系统
+      let audioCtx = null;
+      let masterGain = null;
+      let currentMusicGain = null;
+      let currentMusicOscillators = [];
+      let musicInterval = null;
+      let audioInitialized = false;
+      let isMuted = false;
+      let previousVolume = 0.5;
+
+      // 钢琴音色引擎
+      function createPianoNote(freq, startTime, duration, velocity = 0.7) {
+        if (!audioCtx || isMuted) return;
+        
+        const now = startTime || audioCtx.currentTime;
+        const dur = duration || 1.5;
+        
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'triangle';
+        osc1.frequency.value = freq;
+        gain1.gain.setValueAtTime(velocity * 0.3, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        osc1.connect(gain1);
+        gain1.connect(currentMusicGain || masterGain);
+        osc1.start(now);
+        osc1.stop(now + dur);
+        
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.value = freq * 2;
+        gain2.gain.setValueAtTime(velocity * 0.15, now);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + dur * 0.6);
+        osc2.connect(gain2);
+        gain2.connect(currentMusicGain || masterGain);
+        osc2.start(now);
+        osc2.stop(now + dur * 0.7);
+        
+        const osc3 = audioCtx.createOscillator();
+        const gain3 = audioCtx.createGain();
+        osc3.type = 'square';
+        osc3.frequency.value = freq * 3;
+        gain3.gain.setValueAtTime(velocity * 0.08, now);
+        gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc3.connect(gain3);
+        gain3.connect(currentMusicGain || masterGain);
+        osc3.start(now);
+        osc3.stop(now + 0.06);
+        
+        currentMusicOscillators.push(osc1, osc2, osc3);
+        setTimeout(() => {
+          [osc1, osc2, osc3].forEach(osc => {
+            const idx = currentMusicOscillators.indexOf(osc);
+            if (idx > -1) currentMusicOscillators.splice(idx, 1);
+          });
+        }, dur * 1000 + 100);
+      }
+
+      // 游戏状态
+      let currentLevel = 0;
+      const TOTAL_LEVELS = 4;
+      let targets = [];
+      let player = { x: 0, y: 0, radius: 20 };
+      let scoreInLevel = 0;
+      let requiredScore = 5;
+      let levelCompleted = false;
+      let particles = [];
+      let backgroundHue = 200;
+
+      let canvasWidth = 0;
+      let canvasHeight = 0;
+
+      // 钢琴曲谱定义
+      const pianoScores = [
+        {
+          name: '晨光曲',
+          bpm: 72,
+          pattern: [
+            { note: 'C4', time: 0 }, { note: 'E4', time: 0.8 }, { note: 'G4', time: 1.6 },
+            { note: 'C5', time: 2.4 }, { note: 'G4', time: 3.2 }, { note: 'E4', time: 4.0 },
+            { note: 'D4', time: 4.8 }, { note: 'F4', time: 5.6 }, { note: 'A4', time: 6.4 },
+            { note: 'D5', time: 7.2 }, { note: 'A4', time: 8.0 }, { note: 'F4', time: 8.8 },
+          ]
+        },
+        {
+          name: '海洋呼吸',
+          bpm: 80,
+          pattern: [
+            { note: 'A3', time: 0 }, { note: 'C4', time: 0.6 }, { note: 'E4', time: 1.2 },
+            { note: 'A4', time: 1.8 }, { note: 'E4', time: 2.4 }, { note: 'C4', time: 3.0 },
+            { note: 'G3', time: 3.6 }, { note: 'B3', time: 4.2 }, { note: 'D4', time: 4.8 },
+            { note: 'G4', time: 5.4 }, { note: 'D4', time: 6.0 }, { note: 'B3', time: 6.6 },
+          ]
+        },
+        {
+          name: '火焰之舞',
+          bpm: 90,
+          pattern: [
+            { note: 'E3', time: 0 }, { note: 'G3', time: 0.5 }, { note: 'B3', time: 1.0 },
+            { note: 'E4', time: 1.5 }, { note: 'D4', time: 2.0 }, { note: 'B3', time: 2.5 },
+            { note: 'A3', time: 3.0 }, { note: 'C4', time: 3.5 }, { note: 'E4', time: 4.0 },
+            { note: 'A4', time: 4.5 }, { note: 'G4', time: 5.0 }, { note: 'E4', time: 5.5 },
+          ]
+        },
+        {
+          name: '星夜幻想',
+          bpm: 66,
+          pattern: [
+            { note: 'C5', time: 0 }, { note: 'G4', time: 1.0 }, { note: 'E5', time: 2.0 },
+            { note: 'C5', time: 3.0 }, { note: 'D5', time: 4.0 }, { note: 'A4', time: 5.0 },
+            { note: 'F5', time: 6.0 }, { note: 'D5', time: 7.0 }, { note: 'E5', time: 8.0 },
+            { note: 'G5', time: 9.0 }, { note: 'C6', time: 10.0 }, { note: 'G5', time: 11.0 },
+          ]
+        }
+      ];
+
+      const noteFrequencies = {
+        'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
+        'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+        'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+        'C6': 1046.50, 'D6': 1174.66, 'E6': 1318.51
+      };
+
+      let currentPianoSequence = [];
+      let pianoTimer = null;
+      let pianoStepIndex = 0;
+
+      // ----- 音频初始化 -----
+      function initAudio() {
+        if (audioInitialized) return;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0.5;
+          masterGain.connect(audioCtx.destination);
+          audioInitialized = true;
+          audioPrompt.classList.remove('show');
+          console.log("钢琴音频系统已初始化");
+          updateMuteButtonState();
+          if (currentLevel < TOTAL_LEVELS && !levelCompleted) {
+            startPianoMusic(currentLevel);
+          }
+        } catch (e) {
+          console.warn("音频不可用", e);
+        }
+      }
+
+      function resumeAudio() {
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+
+      function toggleMute() {
+        if (!audioInitialized) {
+          initAudio();
+          playGameStartSound();
+        }
+        
+        isMuted = !isMuted;
+        if (masterGain) {
+          if (isMuted) {
+            previousVolume = masterGain.gain.value;
+            masterGain.gain.value = 0;
+          } else {
+            masterGain.gain.value = previousVolume > 0 ? previousVolume : 0.5;
+          }
+        }
+        updateMuteButtonState();
+      }
+
+      function updateMuteButtonState() {
+        if (isMuted) {
+          muteBtn.innerHTML = '🔇';
+          muteBtn.classList.add('muted');
+        } else {
+          muteBtn.innerHTML = '🔊';
+          muteBtn.classList.remove('muted');
+        }
+      }
+
+      function stopPianoMusic() {
+        if (pianoTimer) {
+          clearTimeout(pianoTimer);
+          pianoTimer = null;
+        }
+        if (currentMusicOscillators.length) {
+          currentMusicOscillators.forEach(osc => {
+            try { osc.stop(); osc.disconnect(); } catch(e) {}
+          });
+          currentMusicOscillators = [];
+        }
+        if (currentMusicGain) {
+          try { currentMusicGain.gain.value = 0; currentMusicGain.disconnect(); } catch(e) {}
+          currentMusicGain = null;
+        }
+        currentPianoSequence = [];
+        pianoStepIndex = 0;
+      }
+
+      function startPianoMusic(levelIndex) {
+        if (!audioCtx || !audioInitialized || isMuted) return;
+        stopPianoMusic();
+        
+        const score = pianoScores[levelIndex];
+        if (!score) return;
+
+        resumeAudio();
+
+        currentMusicGain = audioCtx.createGain();
+        currentMusicGain.gain.value = 0.4;
+        currentMusicGain.connect(masterGain);
+
+        currentPianoSequence = [...score.pattern];
+        pianoStepIndex = 0;
+        
+        const beatDuration = 60 / score.bpm;
+        
+        function playNextNote() {
+          if (!audioCtx || !currentMusicGain || isMuted || levelCompleted || currentLevel !== levelIndex) {
+            return;
+          }
+          
+          if (pianoStepIndex >= currentPianoSequence.length) {
+            pianoStepIndex = 0;
+          }
+          
+          const step = currentPianoSequence[pianoStepIndex];
+          const freq = noteFrequencies[step.note];
+          if (freq) {
+            createPianoNote(freq, audioCtx.currentTime, 1.2, 0.6);
+          }
+          
+          pianoStepIndex++;
+          
+          let nextTime;
+          if (pianoStepIndex < currentPianoSequence.length) {
+            nextTime = (currentPianoSequence[pianoStepIndex].time - step.time) * beatDuration * 1000;
+          } else {
+            nextTime = beatDuration * 1000 * 2;
+          }
+          
+          pianoTimer = setTimeout(playNextNote, Math.max(nextTime, 200));
+        }
+        
+        playNextNote();
+      }
+
+      function playCollectSound() {
+        if (!audioCtx || !audioInitialized || isMuted) return;
+        resumeAudio();
+        const now = audioCtx.currentTime;
+        createPianoNote(523.25, now, 0.4, 0.8);
+        setTimeout(() => createPianoNote(659.25, now + 0.1, 0.3, 0.6), 100);
+      }
+
+      function playLevelCompleteSound() {
+        if (!audioCtx || !audioInitialized || isMuted) return;
+        resumeAudio();
+        const now = audioCtx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, i) => {
+          createPianoNote(freq, now + i * 0.15, 0.5, 0.7);
+        });
+      }
+      
+      function playGameStartSound() {
+        if (!audioCtx || !audioInitialized || isMuted) return;
+        resumeAudio();
+        const now = audioCtx.currentTime;
+        [261.63, 329.63, 392.00].forEach((freq, i) => {
+          createPianoNote(freq, now + i * 0.12, 0.4, 0.6);
+        });
+      }
+
+      const levels = [
+        { name: '🌿 第一幕 · 晨光', description: '触碰流动的光点', hue: 160, targetColor: '#FFD966', required: 5, targetSpeed: 0.6 },
+        { name: '🌊 第二幕 · 深蓝', description: '收集海洋的呼吸', hue: 210, targetColor: '#7EC8E3', required: 6, targetSpeed: 0.9 },
+        { name: '🔥 第三幕 · 赤霞', description: '追逐火焰的节奏', hue: 15, targetColor: '#F4A261', required: 7, targetSpeed: 1.2 },
+        { name: '✨ 第四幕 · 星夜', description: '点亮最后的星座', hue: 270, targetColor: '#C084FC', required: 8, targetSpeed: 1.4 }
+      ];
+
+      function resizeCanvas() {
+        canvasWidth = window.innerWidth;
+        canvasHeight = window.innerHeight;
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        if (player.x === 0 && player.y === 0) {
+          player.x = canvasWidth / 2;
+          player.y = canvasHeight / 2;
+        } else {
+          player.x = Math.min(Math.max(player.x, player.radius), canvasWidth - player.radius);
+          player.y = Math.min(Math.max(player.y, player.radius), canvasHeight - player.radius);
+        }
+      }
+
+      // 【修复】生成恰好 requiredScore 个目标，确保全部可消除
+      function spawnTargets(count, level) {
+        const newTargets = [];
+        const margin = 40;
+        const minDistance = 50; // 最小间距，避免重叠
+        
+        for (let i = 0; i < count; i++) {
+          let attempts = 0;
+          let validPosition = false;
+          let newX, newY;
+          
+          while (!validPosition && attempts < 100) {
+            newX = margin + Math.random() * (canvasWidth - margin * 2);
+            newY = margin + Math.random() * (canvasHeight - margin * 2);
+            validPosition = true;
+            
+            // 检查与已有目标的距离
+            for (const t of newTargets) {
+              const dx = newX - t.x;
+              const dy = newY - t.y;
+              if (Math.sqrt(dx*dx + dy*dy) < minDistance) {
+                validPosition = false;
+                break;
+              }
+            }
+            attempts++;
+          }
+          
+          newTargets.push({
+            x: newX,
+            y: newY,
+            radius: 16 + Math.random() * 10,
+            angle: Math.random() * Math.PI * 2,
+            speed: level.targetSpeed * (0.7 + Math.random() * 0.6),
+            color: level.targetColor,
+            pulse: 0,
+            active: true // 确保目标可交互
+          });
+        }
+        return newTargets;
+      }
+
+      function loadLevel(index) {
+        stopPianoMusic();
+        if (index >= TOTAL_LEVELS) {
+          levelDisplay.textContent = "🎉 艺术永恒 · 你已通关";
+          targetDisplay.textContent = "感谢你的律动";
+          targets = [];
+          levelCompleted = true;
+          if (audioInitialized && !isMuted) playLevelCompleteSound();
+          return;
+        }
+        const level = levels[index];
+        levelDisplay.textContent = level.name;
+        targetDisplay.textContent = level.description;
+        backgroundHue = level.hue;
+        requiredScore = level.required;
+        scoreInLevel = 0;
+        levelCompleted = false;
+        // 【关键修复】只生成 requiredScore 个目标，不多生成
+        targets = spawnTargets(requiredScore, level);
+        console.log(`关卡 ${index+1}: 生成 ${targets.length} 个目标，需要收集 ${requiredScore} 个`);
+        if (audioInitialized && !isMuted) {
+          startPianoMusic(index);
+        }
+      }
+
+      function nextLevel() {
+        currentLevel++;
+        loadLevel(currentLevel);
+      }
+
+      function restartLevel() {
+        stopPianoMusic();
+        loadLevel(currentLevel);
+        player.x = canvasWidth / 2;
+        player.y = canvasHeight / 2;
+        if (audioInitialized && !isMuted) playGameStartSound();
+      }
+
+      function collectTarget(target) {
+        if (!target.active) return; // 防止重复收集
+        target.active = false;
+        
+        playCollectSound();
+        scoreInLevel++;
+        
+        // 粒子效果
+        for (let i = 0; i < 10; i++) {
+          particles.push({
+            x: target.x, y: target.y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            life: 1.0, color: target.color, size: 3 + Math.random() * 6
+          });
+        }
+        
+        // 从数组中移除
+        targets = targets.filter(t => t !== target);
+        
+        console.log(`收集进度: ${scoreInLevel}/${requiredScore}, 剩余目标: ${targets.length}`);
+
+        // 检查是否完成关卡
+        if (scoreInLevel >= requiredScore && !levelCompleted) {
+          levelCompleted = true;
+          playLevelCompleteSound();
+          stopPianoMusic();
+          console.log(`关卡完成！剩余目标: ${targets.length} (应为0)`);
+          
+          setTimeout(() => {
+            if (currentLevel < TOTAL_LEVELS - 1) {
+              nextLevel();
+            } else if (currentLevel === TOTAL_LEVELS - 1) {
+              currentLevel = TOTAL_LEVELS;
+              loadLevel(TOTAL_LEVELS);
+            }
+          }, 2000);
+        }
+      }
+
+      function updateTargets() {
+        targets.forEach(t => {
+          if (!t.active) return;
+          t.angle += 0.02;
+          t.x += Math.cos(t.angle) * t.speed * 0.4;
+          t.y += Math.sin(t.angle) * t.speed * 0.3;
+          
+          // 边界回弹
+          const margin = t.radius + 5;
+          if (t.x < margin) {
+            t.x = margin;
+            t.angle = Math.PI - t.angle;
+          } else if (t.x > canvasWidth - margin) {
+            t.x = canvasWidth - margin;
+            t.angle = Math.PI - t.angle;
+          }
+          if (t.y < margin) {
+            t.y = margin;
+            t.angle = -t.angle;
+          } else if (t.y > canvasHeight - margin) {
+            t.y = canvasHeight - margin;
+            t.angle = -t.angle;
+          }
+          
+          t.pulse = Math.sin(Date.now() * 0.01 + t.x * 0.02) * 0.3 + 0.7;
+        });
+      }
+
+      function updateParticles() {
+        for (let i = particles.length-1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= 0.025;
+          if (p.life <= 0) particles.splice(i,1);
+        }
+      }
+
+      function movePlayerTo(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvasWidth / rect.width;
+        const scaleY = canvasHeight / rect.height;
+        let canvasX = (clientX - rect.left) * scaleX;
+        let canvasY = (clientY - rect.top) * scaleY;
+        canvasX = Math.min(Math.max(canvasX, player.radius), canvasWidth - player.radius);
+        canvasY = Math.min(Math.max(canvasY, player.radius), canvasHeight - player.radius);
+        player.x = canvasX;
+        player.y = canvasY;
+      }
+
+      function checkCollisions() {
+        if (levelCompleted) return;
+        for (let i = targets.length-1; i >= 0; i--) {
+          const t = targets[i];
+          if (!t.active) continue;
+          const dx = player.x - t.x;
+          const dy = player.y - t.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist < player.radius + t.radius) {
+            collectTarget(t);
+            break; // 每帧只收集一个，避免过快
+          }
+        }
+      }
+
+      // 绘制
+      function drawBackground() {
+        const grad = ctx.createLinearGradient(0, 0, canvasWidth*0.6, canvasHeight);
+        grad.addColorStop(0, `hsl(${backgroundHue}, 60%, 12%)`);
+        grad.addColorStop(0.7, `hsl(${backgroundHue+20}, 50%, 8%)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        ctx.strokeStyle = `hsla(${backgroundHue+30}, 70%, 70%, 0.12)`;
+        ctx.lineWidth = 1;
+        const step = 60;
+        for (let i = 0; i < canvasWidth; i+= step) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, canvasHeight);
+          ctx.stroke();
+        }
+        for (let j = 0; j < canvasHeight; j+= step) {
+          ctx.beginPath();
+          ctx.moveTo(0, j);
+          ctx.lineTo(canvasWidth, j);
+          ctx.stroke();
+        }
+      }
+
+      function drawTargets() {
+        targets.forEach(t => {
+          if (!t.active) return;
+          ctx.save();
+          ctx.translate(t.x, t.y);
+          const scale = t.pulse;
+          ctx.shadowColor = t.color;
+          ctx.shadowBlur = 18;
+          ctx.beginPath();
+          ctx.arc(0, 0, t.radius * scale, 0, Math.PI*2);
+          ctx.fillStyle = t.color;
+          ctx.fill();
+          ctx.shadowBlur = 25;
+          ctx.fill();
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(0, 0, t.radius * 0.55, 0, Math.PI*2);
+          ctx.fillStyle = 'white';
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+
+      function drawPlayer() {
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.shadowColor = `hsl(${backgroundHue+40}, 80%, 70%)`;
+        ctx.shadowBlur = 28;
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius, 0, 2*Math.PI);
+        ctx.fillStyle = `hsla(${backgroundHue+20}, 85%, 80%, 0.9)`;
+        ctx.fill();
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius*0.7, 0, 2*Math.PI);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawParticles() {
+        particles.forEach(p => {
+          ctx.globalAlpha = p.life;
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, 2*Math.PI);
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+      }
+
+      function drawUIOverlay() {
+        if (currentLevel >= TOTAL_LEVELS) return;
+        const progress = requiredScore > 0 ? scoreInLevel / requiredScore : 0;
+        const barWidth = Math.min(220, canvasWidth*0.5);
+        const barX = canvasWidth/2 - barWidth/2;
+        const barY = 40;
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, barWidth, 8, 10);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, barWidth * Math.min(progress, 1), 8, 10);
+        ctx.fill();
+        
+        // 显示剩余目标数
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.font = '14px "Segoe UI", system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(`剩余: ${targets.length}`, canvasWidth/2, barY + 28);
+      }
+
+      if (!ctx.roundRect) {
+        ctx.roundRect = function (x, y, w, h, r) {
+          if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+          ctx.beginPath();
+          ctx.moveTo(x + r.tl, y);
+          ctx.lineTo(x + w - r.tr, y);
+          ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+          ctx.lineTo(x + w, y + h - r.br);
+          ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+          ctx.lineTo(x + r.bl, y + h);
+          ctx.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+          ctx.lineTo(x, y + r.tl);
+          ctx.quadraticCurveTo(x, y, x + r.tl, y);
+          ctx.closePath();
+        };
+      }
+
+      function gameLoop() {
+        if (!levelCompleted) {
+          updateTargets();
+          checkCollisions();
+        }
+        updateParticles();
+        drawBackground();
+        drawTargets();
+        drawParticles();
+        drawPlayer();
+        drawUIOverlay();
+        requestAnimationFrame(gameLoop);
+      }
+
+      // 事件绑定
+      function bindEvents() {
+        canvas.addEventListener('mousemove', (e) => {
+          e.preventDefault();
+          movePlayerTo(e.clientX, e.clientY);
+        });
+        canvas.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          if (e.touches.length > 0) movePlayerTo(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+        canvas.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          if (e.touches.length > 0) movePlayerTo(e.touches[0].clientX, e.touches[0].clientY);
+          if (!audioInitialized) { initAudio(); playGameStartSound(); }
+          else resumeAudio();
+        });
+        canvas.addEventListener('click', () => {
+          if (!audioInitialized) { initAudio(); playGameStartSound(); }
+          else resumeAudio();
+        });
+        canvas.addEventListener('dblclick', (e) => {
+          e.preventDefault();
+          restartLevel();
+        });
+        muteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleMute();
+        });
+        fullscreenBtn.addEventListener('click', () => {
+          if (document.fullscreenElement) document.exitFullscreen();
+          else document.documentElement.requestFullscreen();
+        });
+        window.addEventListener('resize', resizeCanvas);
+        document.addEventListener('fullscreenchange', () => {
+          fullscreenBtn.innerHTML = document.fullscreenElement ? '✕' : '⛶';
+        });
+      }
+
+      function startGame() {
+        resizeCanvas();
+        bindEvents();
+        player.x = canvasWidth/2;
+        player.y = canvasHeight/2;
+        currentLevel = 0;
+        loadLevel(0);
+        gameLoop();
+        audioPrompt.classList.add('show');
+        setTimeout(() => { if (!audioInitialized) audioPrompt.classList.remove('show'); }, 5000);
+      }
+
+      window.addEventListener('load', startGame);
+    })();
+  </script>
+</body>
+</html>

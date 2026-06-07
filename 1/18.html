@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=yes, minimal-ui">
+  <title>炫彩粒子 · 钢琴艺术闯关</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      touch-action: pan-x pan-y;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    }
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .fullscreen-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 60px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+      transition: transform 0.2s, background 0.3s;
+      touch-action: manipulation;
+    }
+    .fullscreen-btn:active {
+      transform: scale(0.94);
+      background: rgba(0, 0, 0, 0.7);
+    }
+    .fullscreen-btn svg {
+      width: 28px;
+      height: 28px;
+      fill: white;
+      filter: drop-shadow(0 0 6px #ff66aa);
+    }
+    .ui-info {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 40px;
+      padding: 10px 22px;
+      color: white;
+      font-weight: bold;
+      font-size: 18px;
+      letter-spacing: 1px;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .ui-info span {
+      background: linear-gradient(45deg, #ff3399, #ffcc00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    @media (max-width: 600px) {
+      .fullscreen-btn {
+        bottom: 18px;
+        right: 18px;
+        padding: 10px 16px;
+      }
+      .ui-info {
+        top: 15px;
+        left: 15px;
+        font-size: 16px;
+        padding: 8px 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  
+  <div class="fullscreen-btn" id="fullscreenToggle" role="button" aria-label="全屏模式">
+    <svg viewBox="0 0 24 24">
+      <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+    </svg>
+  </div>
+
+  <div class="ui-info">
+    🎹 <span id="levelDisplay">1</span> · ✨ <span id="scoreDisplay">0</span>
+  </div>
+
+  <script>
+    (function() {
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      const fullscreenBtn = document.getElementById('fullscreenToggle');
+      const levelSpan = document.getElementById('levelDisplay');
+      const scoreSpan = document.getElementById('scoreDisplay');
+
+      let currentLevel = 1;
+      let score = 0;
+      let gameActive = true;
+      
+      const player = {
+        x: 0,
+        y: 0,
+        radius: 18,
+        trail: []
+      };
+
+      let targets = [];
+      const TARGET_RADIUS = 14;
+      let bgParticles = [];
+      let collectBursts = [];
+      
+      let pointerX = window.innerWidth / 2;
+      let pointerY = window.innerHeight / 2;
+      let pointerActive = false;
+
+      let audioCtx = null;
+      let musicGain = null;
+      let currentMusicSource = null;
+      let currentMusicNodes = []; // 存储当前音乐的所有振荡器节点
+      
+      // 可爱的钢琴音色定义（每关不同旋律）
+      const levelPianoConfig = {
+        1: { 
+          notes: ['C4', 'E4', 'G4', 'C5', 'E5', 'G4', 'C5', 'E5'], 
+          tempo: 0.5,
+          description: '简单上行'
+        },
+        2: { 
+          notes: ['G3', 'C4', 'E4', 'G4', 'E4', 'C4', 'D4', 'F4'], 
+          tempo: 0.45,
+          description: '温柔起伏'
+        },
+        3: { 
+          notes: ['A3', 'C4', 'E4', 'A4', 'G4', 'E4', 'C4', 'A3'], 
+          tempo: 0.4,
+          description: '小调华尔兹'
+        },
+        4: { 
+          notes: ['F3', 'A3', 'C4', 'F4', 'A4', 'C5', 'A4', 'F4'], 
+          tempo: 0.48,
+          description: '明亮跳跃'
+        },
+        5: { 
+          notes: ['E4', 'G#4', 'B4', 'E5', 'D5', 'B4', 'G#4', 'E4'], 
+          tempo: 0.42,
+          description: '梦幻回旋'
+        }
+      };
+
+      // 音符频率映射 (A4 = 440Hz)
+      const noteFrequencies = {
+        'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
+        'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+        'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+        'C6': 1046.50, 'G#4': 415.30, 'G#3': 207.65
+      };
+
+      function initAudioContext() {
+        if (audioCtx) return;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          musicGain = audioCtx.createGain();
+          musicGain.gain.value = 0.35;
+          musicGain.connect(audioCtx.destination);
+        } catch (e) {
+          console.warn("音频不可用", e);
+        }
+      }
+
+      function resumeAudio() {
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+
+      // 创建钢琴音色（使用多个正弦波模拟钢琴泛音）
+      function createPianoNote(freq, startTime, duration, gainNode) {
+        if (!audioCtx) return;
+        
+        // 基频
+        const osc1 = audioCtx.createOscillator();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(freq, startTime);
+        
+        // 第二泛音
+        const osc2 = audioCtx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(freq * 2.01, startTime);
+        
+        // 第三泛音（轻微）
+        const osc3 = audioCtx.createOscillator();
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(freq * 3.02, startTime);
+        
+        // 各泛音增益包络（模拟钢琴衰减）
+        const gain1 = audioCtx.createGain();
+        gain1.gain.setValueAtTime(0.5, startTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.9);
+        
+        const gain2 = audioCtx.createGain();
+        gain2.gain.setValueAtTime(0.2, startTime);
+        gain2.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.7);
+        
+        const gain3 = audioCtx.createGain();
+        gain3.gain.setValueAtTime(0.08, startTime);
+        gain3.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.5);
+        
+        osc1.connect(gain1);
+        osc2.connect(gain2);
+        osc3.connect(gain3);
+        
+        gain1.connect(gainNode);
+        gain2.connect(gainNode);
+        gain3.connect(gainNode);
+        
+        osc1.start(startTime);
+        osc2.start(startTime);
+        osc3.start(startTime);
+        
+        osc1.stop(startTime + duration);
+        osc2.stop(startTime + duration);
+        osc3.stop(startTime + duration);
+        
+        // 存储节点以便停止
+        currentMusicNodes.push(osc1, osc2, osc3, gain1, gain2, gain3);
+      }
+
+      function stopCurrentMusic() {
+        // 停止所有当前振荡器
+        for (let node of currentMusicNodes) {
+          try { 
+            if (node.stop) node.stop(); 
+          } catch(e) {}
+        }
+        currentMusicNodes = [];
+        if (currentMusicSource) {
+          try { currentMusicSource.stop(); } catch(e) {}
+          currentMusicSource = null;
+        }
+      }
+
+      function playLevelPianoMusic(level) {
+        if (!audioCtx || !musicGain) return;
+        stopCurrentMusic();
+        
+        const config = levelPianoConfig[level] || levelPianoConfig[1];
+        const notes = config.notes;
+        const tempo = config.tempo;
+        const now = audioCtx.currentTime;
+        
+        // 创建主增益节点用于整体控制
+        const levelGain = audioCtx.createGain();
+        levelGain.gain.setValueAtTime(0.4, now);
+        levelGain.connect(musicGain);
+        
+        // 循环播放旋律
+        function scheduleMelody(startTime) {
+          notes.forEach((note, index) => {
+            const freq = noteFrequencies[note];
+            if (freq) {
+              const noteStart = startTime + index * tempo;
+              createPianoNote(freq, noteStart, tempo * 0.9, levelGain);
+            }
+          });
+        }
+        
+        // 立即开始并设置循环
+        scheduleMelody(now);
+        
+        const loopDuration = notes.length * tempo;
+        
+        // 使用定时器循环（比buffer更灵活）
+        const intervalId = setInterval(() => {
+          if (!audioCtx || audioCtx.state === 'closed') {
+            clearInterval(intervalId);
+            return;
+          }
+          scheduleMelody(audioCtx.currentTime);
+        }, loopDuration * 1000);
+        
+        // 存储interval ID以便停止
+        currentMusicSource = { intervalId, gainNode: levelGain };
+      }
+
+      // 可爱的钢琴音效（收集粒子）
+      function playPianoCollectSound(level) {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        gain.connect(audioCtx.destination);
+        
+        // 根据关卡选择愉快的钢琴音
+        const notes = ['C5', 'E5', 'G5', 'C6'];
+        const noteIndex = (level - 1) % notes.length;
+        const freq = noteFrequencies[notes[noteIndex]] || 523.25;
+        
+        createPianoNote(freq, now, 0.35, gain);
+      }
+
+      function playLevelCompleteSound() {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+        gain.connect(audioCtx.destination);
+        
+        // 上行琶音
+        const notes = ['C4', 'E4', 'G4', 'C5', 'E5'];
+        notes.forEach((note, i) => {
+          const freq = noteFrequencies[note];
+          if (freq) {
+            createPianoNote(freq, now + i * 0.12, 0.3, gain);
+          }
+        });
+      }
+
+      // ==================== 游戏逻辑 ====================
+      function generateTargets(level) {
+        const count = 4 + level;
+        const newTargets = [];
+        const margin = 70;
+        const w = canvas.width;
+        const h = canvas.height;
+        
+        for (let i = 0; i < count; i++) {
+          let overlap = true;
+          let attempts = 0;
+          let tx, ty;
+          while (overlap && attempts < 200) {
+            tx = margin + Math.random() * (w - margin * 2);
+            ty = margin + Math.random() * (h - margin * 2);
+            overlap = false;
+            const distToPlayer = Math.hypot(tx - player.x, ty - player.y);
+            if (distToPlayer < 70) overlap = true;
+            for (let t of newTargets) {
+              if (Math.hypot(tx - t.x, ty - t.y) < TARGET_RADIUS * 2.5) {
+                overlap = true;
+                break;
+              }
+            }
+            attempts++;
+          }
+          newTargets.push({
+            x: tx,
+            y: ty,
+            radius: TARGET_RADIUS,
+            color: `hsl(${Math.random() * 360}, 85%, 70%)`,
+            angle: Math.random() * Math.PI * 2
+          });
+        }
+        return newTargets;
+      }
+
+      function resetLevel(level) {
+        player.x = canvas.width / 2;
+        player.y = canvas.height / 2;
+        player.trail = [];
+        targets = generateTargets(level);
+        collectBursts = [];
+        gameActive = true;
+        updateUI();
+        stopCurrentMusic();
+        playLevelPianoMusic(level);
+      }
+
+      function nextLevel() {
+        if (currentLevel < 5) {
+          currentLevel++;
+        } else {
+          currentLevel = 1;
+        }
+        score = 0;
+        resetLevel(currentLevel);
+        playLevelCompleteSound();
+      }
+
+      function collectTarget(target) {
+        const idx = targets.indexOf(target);
+        if (idx > -1) {
+          targets.splice(idx, 1);
+          score += 10 * currentLevel;
+          
+          for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            collectBursts.push({
+              x: target.x,
+              y: target.y,
+              vx: Math.cos(angle) * (2 + Math.random() * 4),
+              vy: Math.sin(angle) * (2 + Math.random() * 4),
+              life: 0.7,
+              maxLife: 0.7,
+              color: target.color
+            });
+          }
+          
+          playPianoCollectSound(currentLevel);
+          updateUI();
+          
+          if (targets.length === 0) {
+            gameActive = false;
+            setTimeout(() => {
+              nextLevel();
+            }, 1200);
+          }
+        }
+      }
+
+      function updateUI() {
+        levelSpan.textContent = currentLevel;
+        scoreSpan.textContent = score;
+      }
+
+      function checkCollisions() {
+        if (!gameActive) return;
+        for (let i = targets.length - 1; i >= 0; i--) {
+          const t = targets[i];
+          const d = Math.hypot(player.x - t.x, player.y - t.y);
+          if (d < player.radius + t.radius) {
+            collectTarget(t);
+          }
+        }
+      }
+
+      function initBgParticles(count = 80) {
+        bgParticles = [];
+        for (let i = 0; i < count; i++) {
+          bgParticles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 1.2,
+            vy: (Math.random() - 0.5) * 1.2,
+            size: Math.random() * 3.5 + 1,
+            hue: Math.random() * 360,
+            alpha: Math.random() * 0.7 + 0.3
+          });
+        }
+      }
+
+      function updateBgParticles() {
+        for (let p of bgParticles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0) p.x = canvas.width;
+          if (p.x > canvas.width) p.x = 0;
+          if (p.y < 0) p.y = canvas.height;
+          if (p.y > canvas.height) p.y = 0;
+          p.hue = (p.hue + 0.4) % 360;
+        }
+      }
+
+      function drawBackground() {
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        grad.addColorStop(0, `hsl(${(currentLevel * 30) % 360}, 70%, 5%)`);
+        grad.addColorStop(0.5, `hsl(${(currentLevel * 30 + 60) % 360}, 80%, 8%)`);
+        grad.addColorStop(1, `hsl(${(currentLevel * 30 + 120) % 360}, 60%, 4%)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        for (let p of bgParticles) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.hue}, 90%, 70%, ${p.alpha})`;
+          ctx.shadowColor = `hsl(${p.hue}, 100%, 65%)`;
+          ctx.shadowBlur = 8;
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      }
+
+      function drawTargets() {
+        for (let t of targets) {
+          const pulse = Math.sin(Date.now() * 0.008 + t.angle) * 0.2 + 0.8;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, t.radius * pulse, 0, Math.PI * 2);
+          const gradient = ctx.createRadialGradient(t.x, t.y, t.radius*0.2, t.x, t.y, t.radius*1.2);
+          gradient.addColorStop(0, t.color);
+          gradient.addColorStop(0.7, 'rgba(255,255,255,0.7)');
+          gradient.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = gradient;
+          ctx.shadowColor = t.color;
+          ctx.shadowBlur = 20;
+          ctx.fill();
+          
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, t.radius*0.4, 0, Math.PI*2);
+          ctx.fillStyle = 'white';
+          ctx.shadowBlur = 12;
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      }
+
+      function drawPlayer() {
+        for (let i = 0; i < player.trail.length; i++) {
+          const t = player.trail[i];
+          const alpha = i / player.trail.length * 0.5;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, player.radius * 0.7, 0, Math.PI*2);
+          ctx.fillStyle = `rgba(255, 200, 255, ${alpha})`;
+          ctx.shadowColor = '#ff88cc';
+          ctx.shadowBlur = 14;
+          ctx.fill();
+        }
+        
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, 2 * Math.PI);
+        const playerGrad = ctx.createRadialGradient(player.x-4, player.y-4, 3, player.x, player.y, player.radius+4);
+        playerGrad.addColorStop(0, '#ffffff');
+        playerGrad.addColorStop(0.5, '#ffb3ff');
+        playerGrad.addColorStop(1, '#aa44ff');
+        ctx.fillStyle = playerGrad;
+        ctx.shadowColor = '#ff44aa';
+        ctx.shadowBlur = 28;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      function drawCollectBursts() {
+        for (let b of collectBursts) {
+          b.x += b.vx;
+          b.y += b.vy;
+          b.life -= 0.018;
+          if (b.life <= 0) continue;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, 5 * b.life, 0, Math.PI*2);
+          ctx.fillStyle = `rgba(255, 200, 255, ${b.life})`;
+          ctx.shadowColor = b.color;
+          ctx.shadowBlur = 12;
+          ctx.fill();
+        }
+        collectBursts = collectBursts.filter(b => b.life > 0);
+        ctx.shadowBlur = 0;
+      }
+
+      function update() {
+        if (!gameActive) return;
+        
+        const dx = pointerX - player.x;
+        const dy = pointerY - player.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 2 && pointerActive) {
+          const speed = 5.5;
+          player.x += (dx / dist) * speed;
+          player.y += (dy / dist) * speed;
+        }
+        
+        player.x = Math.min(Math.max(player.x, player.radius), canvas.width - player.radius);
+        player.y = Math.min(Math.max(player.y, player.radius), canvas.height - player.radius);
+        
+        player.trail.push({x: player.x, y: player.y});
+        if (player.trail.length > 15) player.trail.shift();
+        
+        updateBgParticles();
+        checkCollisions();
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackground();
+        drawTargets();
+        drawCollectBursts();
+        drawPlayer();
+      }
+
+      function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+
+      function resizeCanvas() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        canvas.width = w;
+        canvas.height = h;
+        
+        if (bgParticles.length > 0) {
+          for (let p of bgParticles) {
+            p.x = Math.random() * w;
+            p.y = Math.random() * h;
+          }
+        }
+        player.x = Math.min(player.x, w - player.radius);
+        player.y = Math.min(player.y, h - player.radius);
+        
+        if (targets.length > 0) {
+          targets = generateTargets(currentLevel);
+        }
+      }
+
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+      });
+
+      function handlePointerMove(e) {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        let clientX, clientY;
+        if (e.touches) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+        
+        pointerX = (clientX - rect.left) * scaleX;
+        pointerY = (clientY - rect.top) * scaleY;
+        pointerActive = true;
+      }
+
+      function handlePointerDown(e) {
+        e.preventDefault();
+        initAudioContext();
+        resumeAudio();
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        let clientX, clientY;
+        if (e.touches) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else {
+          clientX = e.clientX;
+          clientY = e.clientY;
+        }
+        pointerX = (clientX - rect.left) * scaleX;
+        pointerY = (clientY - rect.top) * scaleY;
+        pointerActive = true;
+      }
+
+      function handlePointerUp(e) {
+        e.preventDefault();
+        pointerActive = false;
+      }
+
+      function handlePointerLeave(e) {
+        pointerActive = false;
+      }
+
+      canvas.addEventListener('mousemove', handlePointerMove);
+      canvas.addEventListener('mousedown', handlePointerDown);
+      canvas.addEventListener('mouseup', handlePointerUp);
+      canvas.addEventListener('mouseleave', handlePointerLeave);
+      
+      canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+      canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+      canvas.addEventListener('touchend', handlePointerUp);
+      canvas.addEventListener('touchcancel', handlePointerUp);
+      canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+      function toggleFullscreen() {
+        initAudioContext();
+        resumeAudio();
+        const elem = document.documentElement;
+        
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+          } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+          } else if (elem.webkitEnterFullscreen) {
+            elem.webkitEnterFullscreen();
+          }
+        } else {
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          }
+        }
+      }
+
+      fullscreenBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFullscreen();
+      });
+      
+      fullscreenBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFullscreen();
+      });
+
+      function initialSetup() {
+        resizeCanvas();
+        initBgParticles(90);
+        player.x = canvas.width / 2;
+        player.y = canvas.height / 2;
+        targets = generateTargets(currentLevel);
+        updateUI();
+        initAudioContext();
+        gameLoop();
+      }
+
+      window.addEventListener('load', initialSetup);
+      window.addEventListener('orientationchange', () => {
+        setTimeout(resizeCanvas, 80);
+      });
+    })();
+  </script>
+</body>
+</html>

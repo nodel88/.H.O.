@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>艺境·律动 | 艺术闯关</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a0a;
+      touch-action: manipulation;
+      font-family: 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+    }
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .ui-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      z-index: 10;
+    }
+    .info-panel {
+      pointer-events: none;
+      color: white;
+      text-shadow: 0 0 15px rgba(0,0,0,0.7);
+      font-weight: 300;
+      letter-spacing: 2px;
+      text-align: center;
+      background: rgba(20,20,30,0.5);
+      backdrop-filter: blur(12px);
+      border-radius: 60px;
+      padding: 12px 28px;
+      margin-top: 10px;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .level-badge {
+      font-size: clamp(18px, 5vw, 28px);
+      font-weight: 400;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .instruction {
+      font-size: clamp(12px, 3vw, 16px);
+      opacity: 0.9;
+    }
+    .fullscreen-btn {
+      pointer-events: auto;
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.5);
+      color: white;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+      transition: all 0.3s ease;
+      z-index: 20;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), rgba(0,0,0,0.5));
+    }
+    .fullscreen-btn:active {
+      transform: scale(0.92);
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,200,0.5), rgba(0,0,0,0.7));
+    }
+    @media (max-width: 600px) {
+      .fullscreen-btn {
+        width: 55px;
+        height: 55px;
+        bottom: 20px;
+        right: 20px;
+        font-size: 26px;
+      }
+    }
+    .restart-hint {
+      position: absolute;
+      bottom: 30px;
+      left: 30px;
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(10px);
+      padding: 8px 18px;
+      border-radius: 40px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="artCanvas"></canvas>
+  <div class="ui-container">
+    <div class="info-panel">
+      <div class="level-badge" id="levelDisplay">🌿 第一幕 · 晨光</div>
+      <div class="instruction" id="targetDisplay">✨ 触碰流动的光点</div>
+    </div>
+    <div class="restart-hint" id="restartHint">🔄 双击画面重来</div>
+  </div>
+  <button class="fullscreen-btn" id="fullscreenToggle" aria-label="全屏模式">⛶</button>
+
+  <script>
+    (function() {
+      // ----- 艺术游戏核心：可玩性闯关 + 动态音效/音乐 + 全屏适配 -----
+      const canvas = document.getElementById('artCanvas');
+      const ctx = canvas.getContext('2d');
+
+      // UI元素
+      const levelDisplay = document.getElementById('levelDisplay');
+      const targetDisplay = document.getElementById('targetDisplay');
+      const fullscreenBtn = document.getElementById('fullscreenToggle');
+
+      // 音频上下文 (所有音效/音乐通过Web Audio API生成，无需外部文件)
+      let audioCtx = null;
+      let masterGain = null;
+      let currentMusicGain = null;
+      let currentMusicOscillators = [];
+      let musicInterval = null;
+      let audioInitialized = false;
+
+      // 游戏状态
+      let currentLevel = 0;
+      const TOTAL_LEVELS = 4;
+      let targets = [];
+      let player = { x: 0, y: 0, radius: 20 };
+      let scoreInLevel = 0;
+      let requiredScore = 5;
+      let levelCompleted = false;
+      let particles = [];
+      let backgroundHue = 200;
+
+      // 尺寸适配
+      let canvasWidth = 0;
+      let canvasHeight = 0;
+
+      // ----- 关卡定义：艺术风格 + 音乐参数 + 目标样式 -----
+      const levels = [
+        {
+          name: '🌿 第一幕 · 晨光',
+          description: '触碰流动的光点',
+          hue: 160,
+          targetColor: '#FFD966',
+          musicType: 'soft',
+          freqBase: 220,
+          required: 5,
+          targetSpeed: 0.6
+        },
+        {
+          name: '🌊 第二幕 · 深蓝',
+          description: '收集海洋的呼吸',
+          hue: 210,
+          targetColor: '#7EC8E3',
+          musicType: 'wave',
+          freqBase: 280,
+          required: 6,
+          targetSpeed: 0.9
+        },
+        {
+          name: '🔥 第三幕 · 赤霞',
+          description: '追逐火焰的节奏',
+          hue: 15,
+          targetColor: '#F4A261',
+          musicType: 'tribal',
+          freqBase: 330,
+          required: 7,
+          targetSpeed: 1.2
+        },
+        {
+          name: '✨ 第四幕 · 星夜',
+          description: '点亮最后的星座',
+          hue: 270,
+          targetColor: '#C084FC',
+          musicType: 'ethereal',
+          freqBase: 400,
+          required: 8,
+          targetSpeed: 1.4
+        }
+      ];
+
+      // ----- 初始化音频 (需要用户交互后调用) -----
+      function initAudio() {
+        if (audioInitialized) return;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0.5;
+          masterGain.connect(audioCtx.destination);
+          audioInitialized = true;
+          console.log("音频系统已初始化");
+          // 如果已经在游戏中，立即开始播放当前关卡音乐
+          if (currentLevel < TOTAL_LEVELS && !levelCompleted) {
+            playLevelMusic(currentLevel);
+          }
+        } catch (e) {
+          console.warn("音频不可用", e);
+        }
+      }
+
+      // 确保音频上下文恢复
+      function resumeAudio() {
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().then(() => {
+            console.log("音频上下文已恢复");
+          });
+        }
+      }
+
+      // 停止当前音乐
+      function stopMusic() {
+        if (musicInterval) {
+          clearInterval(musicInterval);
+          musicInterval = null;
+        }
+        if (currentMusicOscillators.length) {
+          currentMusicOscillators.forEach(osc => {
+            try { 
+              osc.stop(); 
+              osc.disconnect();
+            } catch(e) {}
+          });
+          currentMusicOscillators = [];
+        }
+        if (currentMusicGain) {
+          try {
+            currentMusicGain.gain.value = 0;
+            currentMusicGain.disconnect();
+          } catch(e) {}
+          currentMusicGain = null;
+        }
+      }
+
+      // 根据关卡生成背景音乐 (程序化生成，丰富的层次)
+      function playLevelMusic(levelIndex) {
+        if (!audioCtx || !audioInitialized) return;
+        stopMusic();
+        
+        const level = levels[levelIndex];
+        if (!level) return;
+
+        // 确保音频上下文是运行状态
+        resumeAudio();
+
+        currentMusicGain = audioCtx.createGain();
+        currentMusicGain.gain.value = 0.3;
+        currentMusicGain.connect(masterGain);
+
+        const baseFreq = level.freqBase;
+        const type = level.musicType;
+
+        // 创建振荡器并添加到管理数组
+        function createDrone(freq, oscType = 'sine', gainVal = 0.15, detune = 0) {
+          if (!audioCtx) return null;
+          const osc = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          gainNode.gain.value = gainVal;
+          osc.type = oscType;
+          osc.frequency.value = freq;
+          if (detune) osc.detune.value = detune;
+          osc.connect(gainNode);
+          gainNode.connect(currentMusicGain);
+          osc.start();
+          currentMusicOscillators.push(osc);
+          return osc;
+        }
+
+        // 根据音乐类型构建不同层次的和声与节奏
+        if (type === 'soft') {
+          createDrone(baseFreq, 'sine', 0.18);
+          createDrone(baseFreq * 1.5, 'sine', 0.1);
+          createDrone(baseFreq * 0.75, 'triangle', 0.08);
+          // 轻柔的随机音符
+          musicInterval = setInterval(() => {
+            if (!audioCtx || levelCompleted || !currentMusicGain) {
+              clearInterval(musicInterval);
+              return;
+            }
+            const noteFreq = baseFreq * [1, 1.25, 1.5, 0.75][Math.floor(Math.random() * 4)];
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            gain.gain.value = 0.08;
+            osc.type = 'sine';
+            osc.frequency.value = noteFreq;
+            osc.connect(gain);
+            gain.connect(currentMusicGain);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+            currentMusicOscillators.push(osc);
+            setTimeout(() => {
+              const idx = currentMusicOscillators.indexOf(osc);
+              if (idx > -1) currentMusicOscillators.splice(idx, 1);
+            }, 500);
+          }, 2000);
+        } else if (type === 'wave') {
+          createDrone(baseFreq, 'triangle', 0.14);
+          createDrone(baseFreq * 0.5, 'sine', 0.12);
+          createDrone(baseFreq * 1.25, 'sine', 0.08);
+          // 波浪般的渐强渐弱
+          musicInterval = setInterval(() => {
+            if (!audioCtx || levelCompleted || !currentMusicGain) {
+              clearInterval(musicInterval);
+              return;
+            }
+            const pulse = audioCtx.createOscillator();
+            const pg = audioCtx.createGain();
+            pg.gain.setValueAtTime(0.01, audioCtx.currentTime);
+            pg.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.3);
+            pg.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+            pulse.type = 'sine';
+            pulse.frequency.value = baseFreq * 2;
+            pulse.connect(pg);
+            pg.connect(currentMusicGain);
+            pulse.start();
+            pulse.stop(audioCtx.currentTime + 0.9);
+            currentMusicOscillators.push(pulse);
+            setTimeout(() => {
+              const idx = currentMusicOscillators.indexOf(pulse);
+              if (idx > -1) currentMusicOscillators.splice(idx, 1);
+            }, 1000);
+          }, 1800);
+        } else if (type === 'tribal') {
+          createDrone(baseFreq, 'square', 0.1);
+          createDrone(baseFreq * 0.75, 'triangle', 0.12);
+          createDrone(baseFreq * 1.5, 'sawtooth', 0.06);
+          // 打击乐节奏
+          musicInterval = setInterval(() => {
+            if (!audioCtx || levelCompleted || !currentMusicGain) {
+              clearInterval(musicInterval);
+              return;
+            }
+            const hit = audioCtx.createOscillator();
+            const hg = audioCtx.createGain();
+            hg.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            hg.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+            hit.type = 'triangle';
+            hit.frequency.value = baseFreq * 1.8;
+            hit.connect(hg);
+            hg.connect(currentMusicGain);
+            hit.start();
+            hit.stop(audioCtx.currentTime + 0.2);
+            currentMusicOscillators.push(hit);
+            setTimeout(() => {
+              const idx = currentMusicOscillators.indexOf(hit);
+              if (idx > -1) currentMusicOscillators.splice(idx, 1);
+            }, 300);
+          }, 400);
+        } else if (type === 'ethereal') {
+          createDrone(baseFreq, 'sine', 0.12);
+          createDrone(baseFreq * 1.25, 'sine', 0.08);
+          createDrone(baseFreq * 0.6, 'sine', 0.07);
+          createDrone(baseFreq * 1.8, 'sine', 0.04, 10); // 微失谐营造空间感
+          // 闪烁的高音
+          musicInterval = setInterval(() => {
+            if (!audioCtx || levelCompleted || !currentMusicGain) {
+              clearInterval(musicInterval);
+              return;
+            }
+            const star = audioCtx.createOscillator();
+            const sg = audioCtx.createGain();
+            sg.gain.setValueAtTime(0.06, audioCtx.currentTime);
+            sg.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+            star.type = 'sine';
+            star.frequency.value = baseFreq * 2.5;
+            star.connect(sg);
+            sg.connect(currentMusicGain);
+            star.start();
+            star.stop(audioCtx.currentTime + 0.7);
+            currentMusicOscillators.push(star);
+            setTimeout(() => {
+              const idx = currentMusicOscillators.indexOf(star);
+              if (idx > -1) currentMusicOscillators.splice(idx, 1);
+            }, 800);
+          }, 3000);
+        }
+      }
+
+      // 播放音效 (收集目标)
+      function playCollectSound() {
+        if (!audioCtx || !audioInitialized) return;
+        resumeAudio();
+        const now = audioCtx.currentTime;
+        
+        // 主要收集音效 - 明亮上升
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(500, now);
+        osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+        gain1.gain.setValueAtTime(0.25, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc1.connect(gain1);
+        gain1.connect(masterGain);
+        osc1.start(now);
+        osc1.stop(now + 0.3);
+        
+        // 和声点缀
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(750, now);
+        osc2.frequency.exponentialRampToValueAtTime(1500, now + 0.1);
+        gain2.gain.setValueAtTime(0.15, now);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc2.connect(gain2);
+        gain2.connect(masterGain);
+        osc2.start(now);
+        osc2.stop(now + 0.25);
+      }
+
+      function playLevelCompleteSound() {
+        if (!audioCtx || !audioInitialized) return;
+        resumeAudio();
+        const now = audioCtx.currentTime;
+        
+        // 胜利音阶上行
+        const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+        notes.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          const startTime = now + i * 0.15;
+          gain.gain.setValueAtTime(0.2, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start(startTime);
+          osc.stop(startTime + 0.45);
+        });
+        
+        // 光辉闪耀音效
+        const shimmer = audioCtx.createOscillator();
+        const shimmerGain = audioCtx.createGain();
+        shimmer.type = 'sine';
+        shimmer.frequency.setValueAtTime(1500, now);
+        shimmer.frequency.exponentialRampToValueAtTime(3000, now + 0.8);
+        shimmerGain.gain.setValueAtTime(0.1, now);
+        shimmerGain.gain.linearRampToValueAtTime(0.18, now + 0.3);
+        shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+        shimmer.connect(shimmerGain);
+        shimmerGain.connect(masterGain);
+        shimmer.start(now);
+        shimmer.stop(now + 1.1);
+      }
+      
+      // 游戏开始音效
+      function playGameStartSound() {
+        if (!audioCtx || !audioInitialized) return;
+        resumeAudio();
+        const now = audioCtx.currentTime;
+        [0, 0.12, 0.24].forEach((delay, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = 330 * (i + 1);
+          gain.gain.setValueAtTime(0.15, now + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.3);
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start(now + delay);
+          osc.stop(now + delay + 0.35);
+        });
+      }
+
+      // ----- 游戏逻辑 -----
+      function resizeCanvas() {
+        canvasWidth = window.innerWidth;
+        canvasHeight = window.innerHeight;
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        // 更新玩家位置到中心附近（如果未初始化则设置）
+        if (player.x === 0 && player.y === 0) {
+          player.x = canvasWidth / 2;
+          player.y = canvasHeight / 2;
+        } else {
+          // 保持比例，避免超出边界
+          player.x = Math.min(Math.max(player.x, player.radius), canvasWidth - player.radius);
+          player.y = Math.min(Math.max(player.y, player.radius), canvasHeight - player.radius);
+        }
+      }
+
+      // 生成目标点 (艺术化分布)
+      function spawnTargets(count, level) {
+        const newTargets = [];
+        for (let i = 0; i < count; i++) {
+          newTargets.push({
+            x: Math.random() * (canvasWidth - 60) + 30,
+            y: Math.random() * (canvasHeight - 100) + 50,
+            radius: 14 + Math.random() * 12,
+            angle: Math.random() * Math.PI * 2,
+            speed: level.targetSpeed * (0.7 + Math.random() * 0.8),
+            color: level.targetColor,
+            pulse: 0
+          });
+        }
+        return newTargets;
+      }
+
+      function loadLevel(index) {
+        if (index >= TOTAL_LEVELS) {
+          // 游戏通关
+          levelDisplay.textContent = "🎉 艺术永恒 · 你已通关";
+          targetDisplay.textContent = "感谢你的律动";
+          targets = [];
+          levelCompleted = true;
+          stopMusic();
+          if (audioInitialized) playLevelCompleteSound();
+          return;
+        }
+        const level = levels[index];
+        levelDisplay.textContent = level.name;
+        targetDisplay.textContent = level.description;
+        backgroundHue = level.hue;
+        requiredScore = level.required;
+        scoreInLevel = 0;
+        levelCompleted = false;
+        targets = spawnTargets(requiredScore + 2, level); // 多生成一些作为动态美感
+        if (audioInitialized) {
+          playLevelMusic(index);
+        }
+      }
+
+      function nextLevel() {
+        currentLevel++;
+        loadLevel(currentLevel);
+      }
+
+      function restartLevel() {
+        stopMusic();
+        loadLevel(currentLevel);
+        // 重置玩家位置到中心
+        player.x = canvasWidth / 2;
+        player.y = canvasHeight / 2;
+        if (audioInitialized) playGameStartSound();
+      }
+
+      // 处理收集
+      function collectTarget(target) {
+        playCollectSound();
+        scoreInLevel++;
+        // 粒子效果
+        for (let i = 0; i < 8; i++) {
+          particles.push({
+            x: target.x,
+            y: target.y,
+            vx: (Math.random() - 0.5) * 6,
+            vy: (Math.random() - 0.5) * 6,
+            life: 1.0,
+            color: target.color,
+            size: 3 + Math.random() * 5
+          });
+        }
+        // 移除目标
+        targets = targets.filter(t => t !== target);
+
+        // 检查是否完成关卡
+        if (scoreInLevel >= requiredScore && !levelCompleted) {
+          levelCompleted = true;
+          playLevelCompleteSound();
+          stopMusic();
+          // 延迟进入下一关
+          setTimeout(() => {
+            if (currentLevel < TOTAL_LEVELS - 1) {
+              nextLevel();
+            } else if (currentLevel === TOTAL_LEVELS - 1) {
+              // 最后一关完成，进入通关画面
+              currentLevel = TOTAL_LEVELS;
+              loadLevel(TOTAL_LEVELS);
+            }
+          }, 2000);
+        }
+      }
+
+      // 更新目标位置 (动态游走)
+      function updateTargets() {
+        targets.forEach(t => {
+          t.angle += 0.02;
+          t.x += Math.cos(t.angle) * t.speed * 0.4;
+          t.y += Math.sin(t.angle) * t.speed * 0.3;
+          // 边界回弹
+          if (t.x < t.radius || t.x > canvasWidth - t.radius) {
+            t.angle = Math.PI - t.angle;
+            t.x = Math.min(Math.max(t.x, t.radius), canvasWidth - t.radius);
+          }
+          if (t.y < t.radius || t.y > canvasHeight - t.radius) {
+            t.angle = -t.angle;
+            t.y = Math.min(Math.max(t.y, t.radius), canvasHeight - t.radius);
+          }
+          t.pulse = Math.sin(Date.now() * 0.01 + t.x * 0.02) * 0.3 + 0.7;
+        });
+      }
+
+      function updateParticles() {
+        for (let i = particles.length-1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= 0.025;
+          if (p.life <= 0) particles.splice(i,1);
+        }
+      }
+
+      // 玩家移动 (触摸/鼠标)
+      function movePlayerTo(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvasWidth / rect.width;
+        const scaleY = canvasHeight / rect.height;
+        let canvasX = (clientX - rect.left) * scaleX;
+        let canvasY = (clientY - rect.top) * scaleY;
+        canvasX = Math.min(Math.max(canvasX, player.radius), canvasWidth - player.radius);
+        canvasY = Math.min(Math.max(canvasY, player.radius), canvasHeight - player.radius);
+        player.x = canvasX;
+        player.y = canvasY;
+      }
+
+      // 碰撞检测
+      function checkCollisions() {
+        for (let i = targets.length-1; i >= 0; i--) {
+          const t = targets[i];
+          const dx = player.x - t.x;
+          const dy = player.y - t.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist < player.radius + t.radius) {
+            collectTarget(t);
+          }
+        }
+      }
+
+      // ----- 绘制艺术画面 -----
+      function drawBackground() {
+        // 动态渐变背景
+        const grad = ctx.createLinearGradient(0, 0, canvasWidth*0.6, canvasHeight);
+        grad.addColorStop(0, `hsl(${backgroundHue}, 60%, 12%)`);
+        grad.addColorStop(0.7, `hsl(${backgroundHue+20}, 50%, 8%)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // 艺术线条网格
+        ctx.strokeStyle = `hsla(${backgroundHue+30}, 70%, 70%, 0.12)`;
+        ctx.lineWidth = 1;
+        const step = 60;
+        for (let i = 0; i < canvasWidth; i+= step) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, canvasHeight);
+          ctx.stroke();
+        }
+        for (let j = 0; j < canvasHeight; j+= step) {
+          ctx.beginPath();
+          ctx.moveTo(0, j);
+          ctx.lineTo(canvasWidth, j);
+          ctx.stroke();
+        }
+      }
+
+      function drawTargets() {
+        targets.forEach(t => {
+          ctx.save();
+          ctx.translate(t.x, t.y);
+          const scale = t.pulse;
+          // 光晕
+          ctx.shadowColor = t.color;
+          ctx.shadowBlur = 18;
+          ctx.beginPath();
+          ctx.arc(0, 0, t.radius * scale, 0, Math.PI*2);
+          ctx.fillStyle = t.color;
+          ctx.fill();
+          ctx.shadowBlur = 25;
+          ctx.fill();
+          // 内圈
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(0, 0, t.radius * 0.55, 0, Math.PI*2);
+          ctx.fillStyle = 'white';
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+
+      function drawPlayer() {
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        // 艺术化玩家：多层光轮
+        ctx.shadowColor = `hsl(${backgroundHue+40}, 80%, 70%)`;
+        ctx.shadowBlur = 28;
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius, 0, 2*Math.PI);
+        ctx.fillStyle = `hsla(${backgroundHue+20}, 85%, 80%, 0.9)`;
+        ctx.fill();
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius*0.7, 0, 2*Math.PI);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawParticles() {
+        particles.forEach(p => {
+          ctx.globalAlpha = p.life;
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, 2*Math.PI);
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+      }
+
+      function drawUIOverlay() {
+        // 进度指示器
+        if (currentLevel >= TOTAL_LEVELS) return;
+        const progress = requiredScore > 0 ? scoreInLevel / requiredScore : 0;
+        const barWidth = Math.min(220, canvasWidth*0.5);
+        const barX = canvasWidth/2 - barWidth/2;
+        const barY = 40;
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, barWidth, 8, 10);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, barWidth * progress, 8, 10);
+        ctx.fill();
+      }
+
+      // roundRect polyfill
+      if (!ctx.roundRect) {
+        ctx.roundRect = function (x, y, w, h, r) {
+          if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+          ctx.beginPath();
+          ctx.moveTo(x + r.tl, y);
+          ctx.lineTo(x + w - r.tr, y);
+          ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+          ctx.lineTo(x + w, y + h - r.br);
+          ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+          ctx.lineTo(x + r.bl, y + h);
+          ctx.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+          ctx.lineTo(x, y + r.tl);
+          ctx.quadraticCurveTo(x, y, x + r.tl, y);
+          ctx.closePath();
+        };
+      }
+
+      function gameLoop() {
+        if (!levelCompleted) {
+          updateTargets();
+          checkCollisions();
+        }
+        updateParticles();
+        drawBackground();
+        drawTargets();
+        drawParticles();
+        drawPlayer();
+        drawUIOverlay();
+        requestAnimationFrame(gameLoop);
+      }
+
+      // ----- 事件绑定 -----
+      function bindEvents() {
+        // 鼠标/触摸移动玩家
+        canvas.addEventListener('mousemove', (e) => {
+          e.preventDefault();
+          movePlayerTo(e.clientX, e.clientY);
+        });
+        canvas.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          if (e.touches.length > 0) {
+            movePlayerTo(e.touches[0].clientX, e.touches[0].clientY);
+          }
+        }, { passive: false });
+        canvas.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          if (e.touches.length > 0) {
+            movePlayerTo(e.touches[0].clientX, e.touches[0].clientY);
+          }
+          // 初始化音频（需要用户交互）
+          if (!audioInitialized) {
+            initAudio();
+            playGameStartSound();
+          } else {
+            resumeAudio();
+          }
+        });
+        canvas.addEventListener('click', (e) => {
+          if (!audioInitialized) {
+            initAudio();
+            playGameStartSound();
+          } else {
+            resumeAudio();
+          }
+        });
+
+        // 双击重开
+        canvas.addEventListener('dblclick', (e) => {
+          e.preventDefault();
+          restartLevel();
+        });
+
+        // 全屏按钮
+        fullscreenBtn.addEventListener('click', () => {
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            document.documentElement.requestFullscreen();
+          }
+        });
+
+        window.addEventListener('resize', () => {
+          resizeCanvas();
+        });
+        
+        // 监听全屏变化以更新按钮图标
+        document.addEventListener('fullscreenchange', () => {
+          if (document.fullscreenElement) {
+            fullscreenBtn.innerHTML = '✕';
+          } else {
+            fullscreenBtn.innerHTML = '⛶';
+          }
+        });
+      }
+
+      // 启动一切
+      function startGame() {
+        resizeCanvas();
+        bindEvents();
+        // 初始玩家位置
+        player.x = canvasWidth/2;
+        player.y = canvasHeight/2;
+        currentLevel = 0;
+        loadLevel(0);
+        gameLoop();
+        
+        // 显示音频提示
+        console.log("🎵 点击画面或触摸屏幕以启用音频");
+      }
+
+      // 确保在加载后启动
+      window.addEventListener('load', startGame);
+    })();
+  </script>
+</body>
+</html>

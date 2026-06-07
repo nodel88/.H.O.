@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>炫彩粒子艺术闯关游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            touch-action: none;
+        }
+        #app {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .fullscreen-layer {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.2);
+            z-index: 999;
+            border: none;
+            cursor: pointer;
+        }
+        .ui-text {
+            position: fixed;
+            z-index: 100;
+            color: #fff;
+            text-shadow: 0 0 10px #fff, 0 0 20px #f0f;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        .level-info {
+            top: 6%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: clamp(22px, 7vw, 44px);
+            letter-spacing: 3px;
+        }
+        .tip-info {
+            bottom: 12%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: clamp(14px, 4vw, 24px);
+            opacity: 0.8;
+        }
+        .next-tip {
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: clamp(16px, 5vw, 28px);
+            color: #00ffcc;
+            display: none;
+        }
+        .hide {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <canvas id="gameCanvas"></canvas>
+        <button class="fullscreen-layer" id="fsBtn"></button>
+        <div class="ui-text level-info" id="levelText">点击全屏开始游戏</div>
+        <div class="ui-text tip-info" id="tipText">触碰屏幕/鼠标发射粒子闯关</div>
+        <div class="ui-text next-tip" id="nextTip">关卡完成！准备下一关...</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const fsBtn = document.getElementById('fsBtn');
+        const levelText = document.getElementById('levelText');
+        const tipText = document.getElementById('tipText');
+        const nextTip = document.getElementById('nextTip');
+
+        let currentLevel = 1;
+        const maxLevel = 8;
+        let gameStart = false;
+        let isLevelPass = false;
+        let particles = [];
+        let targets = [];
+        let mouse = { x: 0, y: 0, down: false };
+
+        let audioCtx = null;
+        let bgmTimer = null;
+
+        // 画布自适应
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // 全屏（兼容iOS Safari）
+        async function enterFullscreen() {
+            const docEl = document.documentElement;
+            try {
+                if (docEl.requestFullscreen) await docEl.requestFullscreen();
+                else if (docEl.webkitRequestFullscreen) await docEl.webkitRequestFullscreen();
+                else if (docEl.mozRequestFullScreen) await docEl.mozRequestFullScreen();
+                else if (docEl.msRequestFullscreen) await docEl.msRequestFullscreen();
+            } catch(e) {}
+            fsBtn.classList.add('hide');
+            initGame();
+        }
+        fsBtn.addEventListener('click', enterFullscreen);
+
+        // 钢琴音效系统
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playPianoNote(freq, time = 0, dur = 1.2) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+
+            const now = audioCtx.currentTime + time;
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.35, now + 0.005);
+            gain.gain.linearRampToValueAtTime(0.001, now + dur);
+
+            osc.start(now);
+            osc.stop(now + dur + 0.05);
+        }
+
+        function stopBGM() {
+            if (bgmTimer) {
+                clearTimeout(bgmTimer);
+                bgmTimer = null;
+            }
+        }
+
+        function playPianoBGM(level) {
+            if (!audioCtx) return;
+            stopBGM();
+
+            const melodies = [
+                [261.63, 293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66],
+                [293.66, 329.63, 349.23, 392.00, 440.00, 392.00, 349.23, 329.63],
+                [329.63, 349.23, 392.00, 440.00, 493.88, 440.00, 392.00, 349.23],
+                [349.23, 392.00, 440.00, 493.88, 523.25, 493.88, 440.00, 392.00],
+                [392.00, 440.00, 493.88, 523.25, 587.33, 523.25, 493.88, 440.00],
+                [261.63, 329.63, 392.00, 440.00, 493.88, 440.00, 392.00, 329.63],
+                [293.66, 349.23, 440.00, 493.88, 523.25, 493.88, 440.00, 349.23],
+                [329.63, 392.00, 493.88, 523.25, 587.33, 523.25, 493.88, 392.00]
+            ];
+            const mel = melodies[(level - 1) % melodies.length];
+            const beat = 0.22;
+
+            function loopMelody() {
+                if (!gameStart || isLevelPass) return;
+                mel.forEach((f, i) => playPianoNote(f, i * beat, 0.8));
+                bgmTimer = setTimeout(loopMelody, mel.length * beat * 1000);
+            }
+            loopMelody();
+        }
+
+        function playHitPiano(level) {
+            if (!audioCtx) return;
+            const base = 523.25 + level * 50;
+            playPianoNote(base, 0, 0.4);
+        }
+
+        // 粒子类
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 4;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.radius = 2 + Math.random() * 4;
+                this.color = color;
+                this.life = 100;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.02;
+                this.life--;
+                return this.life > 0;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+            }
+        }
+
+        // 目标类
+        class Target {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 25;
+                this.active = true;
+                this.angle = 0;
+            }
+            update() {
+                this.angle += 0.03;
+            }
+            draw() {
+                if (!this.active) return;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const a = (i / 8) * Math.PI * 2;
+                    const r = this.radius * (0.7 + Math.sin(this.angle + i) * 0.3);
+                    const px = Math.cos(a) * r;
+                    const py = Math.sin(a) * r;
+                    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+                grad.addColorStop(0, '#fff');
+                grad.addColorStop(0.5, '#f0f');
+                grad.addColorStop(1, '#0ff');
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.restore();
+            }
+            checkHit(px, py) {
+                const d = Math.hypot(px - this.x, py - this.y);
+                return d < this.radius;
+            }
+        }
+
+        // 初始化单关卡
+        function createLevel(level) {
+            targets = [];
+            particles = [];
+            isLevelPass = false;
+            nextTip.style.display = 'none';
+            const count = 4 + level * 2;
+            const pad = 80;
+            for (let i = 0; i < count; i++) {
+                const x = pad + Math.random() * (canvas.width - pad * 2);
+                const y = pad + Math.random() * (canvas.height - pad * 2);
+                targets.push(new Target(x, y));
+            }
+            levelText.innerText = `第 ${level} 关`;
+            tipText.innerText = `发射粒子击碎全部目标 (${targets.length}个)`;
+            playPianoBGM(level);
+        }
+
+        // 发射粒子
+        function spawnParticles(x, y) {
+            const hue = (Date.now() / 10 + currentLevel * 40) % 360;
+            const color = `hsl(${hue}, 100%, 60%)`;
+            for (let i = 0; i < 12; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        // 游戏初始化
+        function initGame() {
+            initAudio();
+            gameStart = true;
+            currentLevel = 1;
+            createLevel(currentLevel);
+            animate();
+        }
+
+        // 获取坐标
+        function getPos(e) {
+            const t = e.touches ? e.touches[0] : e;
+            return { x: t.clientX, y: t.clientY };
+        }
+
+        // 鼠标&触摸监听
+        window.addEventListener('mousedown', e => {
+            mouse.down = true;
+            const p = getPos(e);
+            mouse.x = p.x; mouse.y = p.y;
+            if (gameStart && !isLevelPass) spawnParticles(mouse.x, mouse.y);
+        });
+        window.addEventListener('mousemove', e => {
+            const p = getPos(e);
+            mouse.x = p.x; mouse.y = p.y;
+        });
+        window.addEventListener('mouseup', () => mouse.down = false);
+        window.addEventListener('touchstart', e => {
+            e.preventDefault();
+            mouse.down = true;
+            const p = getPos(e);
+            mouse.x = p.x; mouse.y = p.y;
+            if (gameStart && !isLevelPass) spawnParticles(mouse.x, mouse.y);
+        });
+        window.addEventListener('touchmove', e => {
+            e.preventDefault();
+            const p = getPos(e);
+            mouse.x = p.x; mouse.y = p.y;
+        });
+        window.addEventListener('touchend', () => mouse.down = false);
+
+        // 主渲染循环
+        function animate() {
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.shadowBlur = 0;
+
+            let allClear = true;
+            targets.forEach(t => {
+                t.update();
+                t.draw();
+                if (t.active) allClear = false;
+            });
+
+            particles = particles.filter(p => {
+                const alive = p.update();
+                if (!alive) return false;
+                p.draw();
+                targets.forEach(t => {
+                    if (t.active && t.checkHit(p.x, p.y)) {
+                        t.active = false;
+                        playHitPiano(currentLevel);
+                    }
+                });
+                return true;
+            });
+
+            // 单关通关判定，逐关推进
+            if (allClear && gameStart && !isLevelPass) {
+                isLevelPass = true;
+                stopBGM();
+                nextTip.style.display = 'block';
+
+                setTimeout(() => {
+                    currentLevel++;
+                    if (currentLevel > maxLevel) {
+                        levelText.innerText = '恭喜全部通关！';
+                        tipText.innerText = '刷新页面重新挑战';
+                        nextTip.style.display = 'none';
+                        gameStart = false;
+                    } else {
+                        createLevel(currentLevel);
+                    }
+                }, 1500);
+            }
+
+            requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,682 @@
+以下是您需要的“艺境·音游幻界”HTML代码。这是一款注重艺术氛围与音乐交互的闯关游戏，可直接在浏览器中运行。
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=yes">
+  <title>艺境 · 音游幻界</title>
+  <style>
+    /* 全局重置与全屏自适应 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0c10;
+      touch-action: manipulation; /* 改善触摸响应 */
+      font-family: 'Segoe UI', 'PingFang SC', system-ui, -apple-system, sans-serif;
+    }
+
+    /* 主画布容器：始终填满视口，采用绝对定位 */
+    #gameContainer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #1a1f2e 0%, #03050a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* 保持艺术比例，同时全屏显示 */
+      background: transparent;
+      touch-action: none; /* 防止触摸时页面拖动 */
+    }
+
+    /* 全屏按钮：覆盖在画布上方，完全透明但可点击，实现全屏交互 */
+    #fullscreenButton {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      border: none;
+      z-index: 100;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+      /* 保证在iOS Safari中全屏按钮覆盖且不影响画布事件，但我们需要将事件传递给画布？ 
+         实际上采用画布自身处理点击，此按钮作为兜底全屏触发器，同时画布也监听点击。
+         为了统一，全屏按钮透明覆盖，通过它触发全屏并传递坐标给游戏逻辑。
+      */
+    }
+
+    /* 让全屏按钮不遮挡画布交互：使用pointer-events穿透点击，但为了触发全屏，我们在按钮上监听，
+       同时游戏逻辑也在canvas上监听。这里采用双监听：按钮负责全屏请求，canvas负责游戏交互。
+       为了避免冲突，按钮设置pointer-events: auto; 但这样会拦截canvas事件。 
+       优化方案：去掉独立按钮，直接在canvas上处理全屏点击和游戏逻辑。 
+       但需求明确“全屏按钮”，因此保留透明按钮，并让其覆盖画布，游戏交互改用按钮事件传递坐标。
+    */
+    #fullscreenButton {
+      pointer-events: auto; /* 接收点击 */
+      background: transparent;
+      border: none;
+      z-index: 10;
+    }
+
+    /* 提示文字（轻量级） */
+    .hint {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 14px;
+      letter-spacing: 2px;
+      z-index: 20;
+      pointer-events: none;
+      font-weight: 300;
+      backdrop-filter: blur(5px);
+      padding: 8px 0;
+      background: rgba(0,0,0,0.2);
+    }
+
+    @media (max-width: 600px) {
+      .hint {
+        font-size: 12px;
+        bottom: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="artCanvas" aria-label="艺术音游画布"></canvas>
+    <!-- 全屏按钮：透明覆盖整个屏幕，用于触发全屏和游戏点击 -->
+    <button id="fullscreenButton" aria-label="全屏交互按钮"></button>
+    <div class="hint" id="hintText">✨ 轻触画面 · 闯关艺境 ✨</div>
+  </div>
+
+  <script>
+    (function() {
+      // ---------- 艺术音游核心 ----------
+      const canvas = document.getElementById('artCanvas');
+      const ctx = canvas.getContext('2d');
+      const fullscreenBtn = document.getElementById('fullscreenButton');
+      const hintElement = document.getElementById('hintText');
+
+      // 音频上下文
+      let audioCtx = null;
+      // 当前关卡索引 (0,1,2 共三关)
+      let currentLevel = 0;
+      const totalLevels = 3;
+      
+      // 游戏状态
+      let gameActive = true;
+      let levelComplete = false;
+      
+      // 交互元素：每个关卡有一个“艺术核心”目标点
+      let target = { x: 0, y: 0, radius: 50, color: '#e0b0ff' };
+      
+      // 玩家触摸/点击位置（用于视觉反馈）
+      let touchX = -100, touchY = -100;
+      let touchActive = false;
+      
+      // 粒子系统（艺术背景）
+      let particles = [];
+      const PARTICLE_COUNT = 80;
+      
+      // 波纹特效
+      let ripples = [];
+      
+      // 关卡过渡计时
+      let transitionTimer = 0;
+      const TRANSITION_DURATION = 90; // 帧数大约1.5秒(60fps)
+      
+      // 成功闪光
+      let successFlash = 0;
+      
+      // 自适应尺寸
+      function resizeCanvas() {
+        const container = document.getElementById('gameContainer');
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width || window.innerWidth;
+        canvas.height = rect.height || window.innerHeight;
+        
+        // 重新初始化目标位置（基于尺寸）
+        initTargetForLevel();
+        // 粒子也需要根据尺寸重新分布
+        initParticles();
+      }
+      
+      // 根据关卡设置目标位置与视觉属性
+      function initTargetForLevel() {
+        const w = canvas.width;
+        const h = canvas.height;
+        // 每关目标在不同区域，增加探索感
+        switch(currentLevel) {
+          case 0: // 第一关：左上方区域
+            target.x = w * 0.3;
+            target.y = h * 0.35;
+            target.radius = Math.min(w, h) * 0.12;
+            target.color = '#d4a5ff';
+            break;
+          case 1: // 第二关：右下方
+            target.x = w * 0.7;
+            target.y = h * 0.65;
+            target.radius = Math.min(w, h) * 0.13;
+            target.color = '#7ec8ff';
+            break;
+          case 2: // 第三关：中心偏上
+            target.x = w * 0.5;
+            target.y = h * 0.4;
+            target.radius = Math.min(w, h) * 0.14;
+            target.color = '#ffb07c';
+            break;
+          default: 
+            target.x = w/2;
+            target.y = h/2;
+        }
+        // 保证半径不小于30px
+        if (target.radius < 30) target.radius = 30;
+        if (target.radius > 150) target.radius = 150;
+      }
+      
+      // 粒子初始化
+      function initParticles() {
+        particles = [];
+        const w = canvas.width;
+        const h = canvas.height;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          particles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            baseX: Math.random() * w,
+            baseY: Math.random() * h,
+            size: Math.random() * 4 + 1.5,
+            speedX: (Math.random() - 0.5) * 0.3,
+            speedY: (Math.random() - 0.5) * 0.3,
+            hue: Math.random() * 60 + 200, // 蓝紫色调范围
+            alpha: Math.random() * 0.5 + 0.2,
+          });
+        }
+      }
+      
+      // 添加波纹
+      function addRipple(x, y) {
+        ripples.push({
+          x, y,
+          radius: 5,
+          maxRadius: 80 + Math.random() * 60,
+          alpha: 0.7,
+          color: target.color,
+        });
+        if (ripples.length > 15) ripples.shift();
+      }
+      
+      // ---------- 音频引擎 (使用Web Audio API生成艺术音效) ----------
+      function initAudioContext() {
+        if (audioCtx) return;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          // 若处于暂停状态，需在用户手势下恢复
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+        } catch (e) {
+          console.warn('Web Audio API 不可用', e);
+        }
+      }
+      
+      // 播放关卡背景音乐 (使用振荡器生成氛围音乐)
+      let bgmOscillators = [];
+      let bgmGainNode = null;
+      
+      function stopBGM() {
+        bgmOscillators.forEach(osc => {
+          try { osc.stop(); } catch(e) {}
+        });
+        bgmOscillators = [];
+        if (bgmGainNode) {
+          bgmGainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        }
+      }
+      
+      function playLevelBGM(level) {
+        if (!audioCtx) return;
+        stopBGM();
+        
+        // 创建增益节点控制音量
+        bgmGainNode = audioCtx.createGain();
+        bgmGainNode.gain.value = 0.12;
+        bgmGainNode.connect(audioCtx.destination);
+        
+        // 根据关卡定义不同频率组合 (营造艺术氛围)
+        let frequencies = [];
+        switch(level) {
+          case 0: // 空灵低语
+            frequencies = [261.6, 329.6, 392.0]; // C4, E4, G4
+            break;
+          case 1: // 深邃海洋
+            frequencies = [220.0, 277.2, 330.0]; // A3, C#4, E4
+            break;
+          case 2: // 温暖曙光
+            frequencies = [293.7, 369.9, 440.0]; // D4, F#4, A4
+            break;
+          default: frequencies = [261.6, 329.6];
+        }
+        
+        // 为每个频率创建振荡器，使用三角波或正弦波营造柔和感
+        frequencies.forEach(freq => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = level === 1 ? 'sine' : 'triangle';
+          osc.frequency.value = freq;
+          // 轻微失谐增加丰富度
+          osc.detune.value = Math.random() * 10 - 5;
+          gain.gain.value = 0.25;
+          osc.connect(gain);
+          gain.connect(bgmGainNode);
+          osc.start();
+          bgmOscillators.push(osc);
+        });
+        
+        // 添加一个低频氛围
+        const bassOsc = audioCtx.createOscillator();
+        const bassGain = audioCtx.createGain();
+        bassOsc.type = 'sine';
+        bassOsc.frequency.value = level === 0 ? 130.8 : level === 1 ? 110 : 146.8;
+        bassGain.gain.value = 0.18;
+        bassOsc.connect(bassGain);
+        bassGain.connect(bgmGainNode);
+        bassOsc.start();
+        bgmOscillators.push(bassOsc);
+      }
+      
+      // 播放音效：点击/互动音效
+      function playInteractionSound(freq = 520, type = 'sine', duration = 0.15) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      }
+      
+      // 成功音效 (闯关成功)
+      function playSuccessSound() {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        [523.25, 659.25, 783.99].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.2, now + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + i * 0.12);
+          osc.stop(now + i * 0.12 + 0.35);
+        });
+      }
+      
+      // 下一关
+      function goToNextLevel() {
+        if (currentLevel < totalLevels - 1) {
+          currentLevel++;
+          levelComplete = false;
+          gameActive = true;
+          transitionTimer = 0;
+          successFlash = 15;
+          initTargetForLevel();
+          stopBGM();
+          playLevelBGM(currentLevel);
+          playSuccessSound();
+          hintElement.textContent = `🎨 第${currentLevel+1}关 · 探索新的和声`;
+        } else {
+          // 游戏通关
+          gameActive = false;
+          levelComplete = true;
+          stopBGM();
+          if (audioCtx) {
+            // 播放胜利旋律
+            const now = audioCtx.currentTime;
+            [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+              const osc = audioCtx.createOscillator();
+              const gain = audioCtx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.value = freq;
+              gain.gain.setValueAtTime(0.25, now + i * 0.15);
+              gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.5);
+              osc.connect(gain);
+              gain.connect(audioCtx.destination);
+              osc.start(now + i * 0.15);
+              osc.stop(now + i * 0.15 + 0.55);
+            });
+          }
+          hintElement.textContent = '🌟 艺境圆满 · 你已抵达和谐 🌟';
+        }
+      }
+      
+      // 处理点击/触摸 (用于游戏交互与全屏)
+      function handleInteraction(clientX, clientY) {
+        // 尝试初始化音频上下文 (需用户手势)
+        initAudioContext();
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        
+        // 如果游戏未激活但未通关(理论上不会)，或者通关了，轻触仍可播放音效
+        if (!gameActive && levelComplete && currentLevel === totalLevels-1) {
+          playInteractionSound(440, 'sine', 0.2);
+          addRipple(clientX, clientY);
+          return;
+        }
+        
+        if (!gameActive) return;
+        
+        // 获取画布相对坐标
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;   // canvas 物理像素比例
+        const scaleY = canvas.height / rect.height;
+        
+        const canvasX = (clientX - rect.left) * scaleX;
+        const canvasY = (clientY - rect.top) * scaleY;
+        
+        // 更新触摸位置用于视觉反馈
+        touchX = canvasX;
+        touchY = canvasY;
+        touchActive = true;
+        setTimeout(() => { touchActive = false; }, 200);
+        
+        // 添加波纹
+        addRipple(canvasX, canvasY);
+        
+        // 播放互动音效 (根据关卡变化)
+        const soundFreq = currentLevel === 0 ? 480 : currentLevel === 1 ? 420 : 560;
+        playInteractionSound(soundFreq, 'sine', 0.12);
+        
+        // 检测是否点击到目标
+        const dx = canvasX - target.x;
+        const dy = canvasY - target.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist <= target.radius && !levelComplete && gameActive) {
+          // 成功击中目标！
+          levelComplete = true;
+          gameActive = false;
+          successFlash = 20;
+          playSuccessSound();
+          hintElement.textContent = '✨ 和谐达成！准备进入下一层艺境...';
+          // 延迟进入下一关
+          setTimeout(() => {
+            if (currentLevel < totalLevels - 1) {
+              goToNextLevel();
+            } else {
+              // 已经是最后一关，显示通关
+              goToNextLevel(); // 内部处理通关状态
+            }
+          }, 1200);
+        }
+      }
+      
+      // 事件监听
+      function bindEvents() {
+        // 使用全屏按钮捕获点击/触摸
+        fullscreenBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const clientX = e.clientX;
+          const clientY = e.clientY;
+          handleInteraction(clientX, clientY);
+          
+          // 同时尝试触发全屏 (iOS Safari 需要特定处理)
+          requestFullscreen();
+        });
+        
+        fullscreenBtn.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          const touch = e.touches[0];
+          if (touch) {
+            handleInteraction(touch.clientX, touch.clientY);
+          }
+          // 全屏请求
+          requestFullscreen();
+        }, { passive: false });
+        
+        // 也监听canvas上的触摸以防按钮事件被某些情况拦截 (但按钮覆盖其上)
+        canvas.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          const touch = e.touches[0];
+          if (touch) {
+            handleInteraction(touch.clientX, touch.clientY);
+          }
+          requestFullscreen();
+        }, { passive: false });
+        
+        canvas.addEventListener('click', (e) => {
+          handleInteraction(e.clientX, e.clientY);
+          requestFullscreen();
+        });
+        
+        window.addEventListener('resize', resizeCanvas);
+      }
+      
+      function requestFullscreen() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+          el.requestFullscreen().catch(() => {});
+        } else if (el.webkitRequestFullscreen) { /* iOS Safari */
+          el.webkitRequestFullscreen();
+        } else if (el.webkitEnterFullscreen) {
+          el.webkitEnterFullscreen();
+        }
+      }
+      
+      // ---------- 绘制图形 (艺术渲染) ----------
+      function drawBackground() {
+        const w = canvas.width;
+        const h = canvas.height;
+        // 渐变背景
+        const gradient = ctx.createLinearGradient(0, 0, w, h);
+        if (currentLevel === 0) {
+          gradient.addColorStop(0, '#1a1a2e');
+          gradient.addColorStop(0.7, '#16213e');
+        } else if (currentLevel === 1) {
+          gradient.addColorStop(0, '#0f2027');
+          gradient.addColorStop(0.7, '#203a43');
+        } else {
+          gradient.addColorStop(0, '#2c1b2c');
+          gradient.addColorStop(0.7, '#4a2c3b');
+        }
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, w, h);
+        
+        // 绘制流动粒子
+        particles.forEach(p => {
+          p.x += p.speedX;
+          p.y += p.speedY;
+          // 边界回弹
+          if (p.x < 0 || p.x > w) p.speedX *= -1;
+          if (p.y < 0 || p.y > h) p.speedY *= -1;
+          
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.hue + currentLevel * 15}, 70%, 75%, ${p.alpha})`;
+          ctx.fill();
+        });
+      }
+      
+      function drawTarget() {
+        const { x, y, radius, color } = target;
+        // 光晕
+        const glowGradient = ctx.createRadialGradient(x, y, radius * 0.4, x, y, radius * 1.6);
+        glowGradient.addColorStop(0, color);
+        glowGradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+        glowGradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 1.6, 0, Math.PI*2);
+        ctx.fillStyle = glowGradient;
+        ctx.fill();
+        
+        // 核心圆
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI*2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        
+        // 内部旋转纹理
+        ctx.save();
+        ctx.translate(x, y);
+        const time = Date.now() * 0.002;
+        ctx.rotate(time * 0.2);
+        for (let i = 0; i < 6; i++) {
+          ctx.rotate(Math.PI/3);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(radius * 0.7, 0);
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+        }
+        ctx.restore();
+        
+        // 关卡数字
+        ctx.font = `bold ${Math.floor(radius * 0.6)}px "PingFang SC", sans-serif`;
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(currentLevel + 1, x, y);
+      }
+      
+      function drawRipples() {
+        ripples.forEach((rip, index) => {
+          rip.radius += 2.5;
+          rip.alpha -= 0.015;
+          if (rip.alpha <= 0 || rip.radius > rip.maxRadius) {
+            ripples.splice(index, 1);
+            return;
+          }
+          ctx.beginPath();
+          ctx.arc(rip.x, rip.y, rip.radius, 0, Math.PI*2);
+          ctx.strokeStyle = `rgba(255,255,255,${rip.alpha})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        });
+      }
+      
+      function drawTouchFeedback() {
+        if (!touchActive) return;
+        ctx.beginPath();
+        ctx.arc(touchX, touchY, 18, 0, 2*Math.PI);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      
+      function drawSuccessFlash() {
+        if (successFlash > 0) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${successFlash * 0.02})`;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          successFlash--;
+        }
+      }
+      
+      function drawUI() {
+        // 顶部关卡指示器
+        ctx.font = '16px "PingFang SC", sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.textAlign = 'right';
+        ctx.fillText(`艺境 ${currentLevel+1}/${totalLevels}`, canvas.width - 25, 45);
+      }
+      
+      function animate() {
+        if (!canvas || !ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        drawBackground();
+        drawRipples();
+        drawTarget();
+        drawTouchFeedback();
+        drawSuccessFlash();
+        drawUI();
+        
+        requestAnimationFrame(animate);
+      }
+      
+      // 启动一切
+      function startGame() {
+        resizeCanvas();
+        initParticles();
+        initTargetForLevel();
+        bindEvents();
+        // 初始播放第一关BGM (需等待用户交互激活音频上下文，所以在第一次点击时也会调用playLevelBGM)
+        // 但为了用户体验，尝试在初始化时准备音频，实际播放需在用户手势后。
+        // 我们将在handleInteraction中首次调用initAudioContext并播放BGM。
+        // 设置一个标志确保BGM只启动一次。
+        window.addEventListener('load', () => {
+          // 尝试预初始化音频上下文
+          initAudioContext();
+        });
+        
+        // 开始动画循环
+        animate();
+        
+        // 设置初始提示
+        hintElement.textContent = '✨ 轻触发光核心 · 进入第一层艺境 ✨';
+      }
+      
+      // 处理首次交互启动BGM
+      const originalInteraction = handleInteraction;
+      handleInteraction = function(clientX, clientY) {
+        // 首次交互时启动BGM（如果未启动）
+        if (!audioCtx || bgmOscillators.length === 0) {
+          initAudioContext();
+          if (audioCtx && audioCtx.state === 'running') {
+            playLevelBGM(currentLevel);
+          } else if (audioCtx) {
+            audioCtx.resume().then(() => {
+              playLevelBGM(currentLevel);
+            });
+          }
+        }
+        originalInteraction(clientX, clientY);
+      };
+      
+      // 页面完全加载后启动
+      window.addEventListener('load', startGame);
+      
+      // 处理iOS Safari 全屏变化
+      document.addEventListener('fullscreenchange', resizeCanvas);
+      document.addEventListener('webkitfullscreenchange', resizeCanvas);
+      
+    })();
+  </script>
+</body>
+</html>

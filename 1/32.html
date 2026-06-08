@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>星尘触碰 | 陨石宝石之旅</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none; /* 全局禁止选中，配合长按禁用 */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Poppins', 'Orbitron', system-ui, -apple-system, 'Inter', sans-serif;
+            touch-action: manipulation;
+            background: #0a0f1e;
+        }
+
+        /* 游戏画布层 */
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        /* UI 界面 - 悬浮层, 无交互穿透但按钮可点 */
+        .ui-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .ui-panel {
+            pointer-events: auto;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 12px;
+            background: rgba(10, 20, 30, 0.55);
+            backdrop-filter: blur(12px);
+            border-radius: 48px;
+            padding: 8px 16px;
+            border: 1px solid rgba(255,255,240,0.25);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .ui-panel button, .settings-btn {
+            background: rgba(0,0,0,0.6);
+            border: none;
+            color: #ffecb3;
+            font-weight: bold;
+            font-size: 1rem;
+            padding: 6px 14px;
+            border-radius: 40px;
+            backdrop-filter: blur(4px);
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+        .ui-panel button:hover { background: #ffb347; color:#1e1a2f; transform: scale(1.02);}
+        .level-gem-area {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 40px;
+            padding: 8px 20px;
+            color: gold;
+            font-weight: bold;
+            font-size: 1.3rem;
+            display: flex;
+            gap: 25px;
+            pointer-events: auto;
+        }
+        .level-text, .gem-counter {
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px #ffaa33;
+        }
+        .gem-counter {
+            cursor: pointer;
+            transition: 0.2s;
+            background: rgba(0,0,0,0.4);
+            padding: 0 12px;
+            border-radius: 30px;
+        }
+        .gem-counter:hover { background: #ffaa44aa; transform: scale(1.02);}
+        .fps-meter {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: #000000aa;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 14px;
+            color: #0f0;
+            pointer-events: none;
+            z-index: 20;
+            backdrop-filter: blur(4px);
+        }
+        .settings-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            pointer-events: auto;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+        }
+        .settings-card {
+            background: #1f2a3ecc;
+            backdrop-filter: blur(20px);
+            border-radius: 40px;
+            padding: 24px;
+            width: 280px;
+            color: white;
+            border: 1px solid gold;
+            text-align: center;
+        }
+        .settings-card h3 { margin-bottom: 15px; }
+        .setting-row { margin: 12px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        select, input { background: #2a3a50; border: none; padding: 6px; border-radius: 20px; color:white; }
+        .close-settings { margin-top: 20px; background: gold; color: black; width: 100%; padding: 8px; border-radius: 30px; font-weight: bold; cursor: pointer;}
+        .vault-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            z-index: 201;
+            pointer-events: auto;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .vault-content {
+            background: #2a2a3aee;
+            border-radius: 40px;
+            width: 90%;
+            max-width: 600px;
+            padding: 20px;
+            color: #ffd966;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .gem-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .gem-card {
+            background: #00000066;
+            border-radius: 24px;
+            padding: 12px;
+            text-align: center;
+            animation: floatGem 1s ease infinite alternate;
+            transition: 0.2s;
+        }
+        .gem-icon { font-size: 48px; display: inline-block; animation: spin3d 3s infinite linear; transform-style: preserve-3d; }
+        @keyframes spin3d {
+            0% { transform: rotateY(0deg);}
+            100% { transform: rotateY(360deg);}
+        }
+        .toast-msg {
+            position: fixed;
+            bottom: 30%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ffd966dd;
+            color: #1e1f2c;
+            padding: 8px 20px;
+            border-radius: 60px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 300;
+            transition: 0.2s;
+            opacity: 0;
+        }
+        button:active { transform: scale(0.96);}
+        @keyframes screenShake {
+            0% { transform: translate(1px,1px);}
+            25% { transform: translate(-1px,-1px);}
+            100% { transform: translate(0,0);}
+        }
+        .shake-effect { animation: screenShake 0.08s linear 3; }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div class="ui-container">
+    <div class="level-gem-area">
+        <div class="level-text">✨ 第 <span id="levelNum">1</span> / 999 关</div>
+        <div class="gem-counter" id="gemCounterBtn">💎 宝石库: <span id="totalGemCount">0</span></div>
+    </div>
+    <div class="ui-panel">
+        <button id="settingsBtn">🎛️ 设置</button>
+        <button id="fullscreenBtn">🖥️ 全屏</button>
+    </div>
+    <div class="fps-meter" id="fpsMeter">FPS: --</div>
+</div>
+<div class="settings-modal" id="settingsModal">
+    <div class="settings-card">
+        <h3>✨ 星际设置 ✨</h3>
+        <div class="setting-row">🎨 主题 <select id="themeSelect"><option value="classic">经典紫</option><option value="deepblue">深空蓝</option><option value="neon">霓虹梦</option><option value="sunset">日落余晖</option><option value="forest">翡翠森林</option></select></div>
+        <div class="setting-row">⚡ 画质 <select id="qualitySelect"><option value="super">超级 (全特效)</option><option value="standard">标准</option><option value="fast">快速 (性能优化)</option></select></div>
+        <div class="setting-row">🎵 背景音量 <input type="range" id="bgmVol" min="0" max="100" value="30"></div>
+        <div class="setting-row">🎹 打击音量 <input type="range" id="sfxVol" min="0" max="100" value="70"></div>
+        <div class="setting-row">🔇 一键静音 <button id="muteToggleBtn">静音开/关</button></div>
+        <button class="close-settings" id="closeSettings">保存并关闭</button>
+    </div>
+</div>
+<div class="vault-modal" id="vaultModal">
+    <div class="vault-content">
+        <h2>💎 宝石宝库 💎</h2>
+        <div id="gemGridContainer" class="gem-grid">加载藏品中...</div>
+        <button id="closeVault" style="margin-top:20px; background:#ffaa33; border:none; padding:8px; border-radius:40px;">关闭</button>
+    </div>
+</div>
+<div id="toastMsg" class="toast-msg">✨ 提示</div>
+<script>
+    (function(){
+        // ---------- 核心存储 ----------
+        let saveData = {
+            level: 1,
+            totalGems: 0,
+            gemLibrary: [],   // 存储宝石名字 {name, color, shape}
+            soundEnabled: true,
+            bgVolume: 0.3,
+            sfxVolume: 0.7,
+            theme: 'classic',
+            quality: 'super'
+        };
+        function loadSave(){
+            const stored = localStorage.getItem('StardustTouchSave');
+            if(stored){
+                try{
+                    const data = JSON.parse(stored);
+                    saveData = {...saveData, ...data};
+                }catch(e){}
+            }
+            if(!saveData.gemLibrary) saveData.gemLibrary = [];
+            if(!saveData.totalGems) saveData.totalGems = saveData.gemLibrary.length;
+            updateUIValues();
+        }
+        function persist(){
+            localStorage.setItem('StardustTouchSave', JSON.stringify(saveData));
+        }
+        function addGemToLibrary(gemType){ // gemType 随机风格宝石
+            const gemNames = ["星辰碎片", "暮光晶钻", "幻梦玛瑙", "陨火红玉", "苍穹蓝晶", "翡翠之心", "琥珀流光", "紫罗兰辉", "日曜石"];
+            const colors = ["#ff88cc","#66ccff","#ffaa66","#77ff99","#ff77aa","#aaffdd","#ffcc88","#c07cfc","#ffb347"];
+            const rand = Math.floor(Math.random() * gemNames.length);
+            const gem = { name: gemNames[rand], color: colors[rand], collectedAt: Date.now(), id: Date.now()+rand };
+            saveData.gemLibrary.push(gem);
+            saveData.totalGems = saveData.gemLibrary.length;
+            persist();
+        }
+        
+        // DOM 元素
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        // 游戏全局
+        let asteroids = [];       // 陨石 {x,y, radius, hp, maxHp, angle, spin, color}
+        let particles = [];       // 点击粒子特效
+        let gems = [];            // 宝石 {x, y, vx, vy, gravity, targetX, targetY, active, color, name}
+        let fragments = [];       // 破碎特效
+        
+        let currentLevel = 1;
+        let targetAsteroidCount = 3;
+        let gameLoopId;
+        let frameCount = 0, lastTime = performance.now(), fps = 60;
+        let qualityMode = 'super'; // super/standard/fast
+        let themeStyle = 'classic';
+        
+        // 音效模拟 (Web Audio API 轻量钢琴音，浏览器安全策略需用户交互后启用)
+        let audioCtx = null;
+        let isAudioAllowed = false;
+        let masterMute = false;
+        let bgmGain, sfxGain;
+        let bgmOsc = null; // 简易氛围音
+        function initAudio(){
+            if(audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            bgmGain = audioCtx.createGain();
+            sfxGain = audioCtx.createGain();
+            bgmGain.connect(audioCtx.destination);
+            sfxGain.connect(audioCtx.destination);
+            bgmGain.gain.value = saveData.bgVolume * (masterMute?0:1);
+            sfxGain.gain.value = saveData.sfxVolume * (masterMute?0:1);
+            startAmbientBGM();
+        }
+        function startAmbientBGM(){
+            if(bgmOsc) try{ bgmOsc.stop(); }catch(e){}
+            if(!audioCtx || masterMute || saveData.bgVolume===0) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 220 + (currentLevel % 10)*2;
+            gain.gain.value = 0.12;
+            osc.connect(gain);
+            gain.connect(bgmGain);
+            osc.start();
+            bgmOsc = osc;
+            setInterval(()=>{ if(bgmOsc && audioCtx) bgmOsc.frequency.value = 220 + (currentLevel % 12)*2.5; }, 8000);
+        }
+        function playPianoHit(pitch = 440){
+            if(!audioCtx || masterMute || saveData.sfxVolume===0) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.value = pitch;
+            gainNode.gain.value = 0.2 * saveData.sfxVolume;
+            osc.connect(gainNode);
+            gainNode.connect(sfxGain);
+            osc.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+0.5);
+            osc.stop(audioCtx.currentTime+0.5);
+        }
+        
+        // 波纹特效 + 粒子簇
+        function createClickParticles(x,y){
+            let count = (qualityMode === 'fast') ? 12 : (qualityMode==='standard'?24:40);
+            for(let i=0;i<count;i++){
+                let angle = Math.random()*Math.PI*2;
+                let speed = 2+Math.random()*6;
+                let vx = Math.cos(angle)*speed;
+                let vy = Math.sin(angle)*speed;
+                particles.push({
+                    x:x, y:y, vx:vx, vy:vy, life:1.0, size:3+Math.random()*4,
+                    color:`hsl(${Math.random()*360}, 80%, 65%)`
+                });
+            }
+            // 波纹视觉反馈（画布临时效果）
+        }
+        function addScreenShake(){
+            document.body.classList.add('shake-effect');
+            setTimeout(()=>document.body.classList.remove('shake-effect'), 100);
+        }
+        
+        // 陨石初始化关卡
+        function initLevel(level){
+            let baseCount = 3 + Math.floor((level-1)/2);
+            if(baseCount>18) baseCount = 18;
+            targetAsteroidCount = baseCount;
+            asteroids = [];
+            gems = [];
+            for(let i=0;i<targetAsteroidCount;i++){
+                let radius = 18 + Math.random()*16;
+                let hp = Math.min(2 + Math.floor(level/30), 8);
+                let angle = Math.random()*Math.PI*2;
+                let x = 80 + Math.random()*(width-160);
+                let y = 80 + Math.random()*(height-160);
+                asteroids.push({
+                    x, y, radius, hp, maxHp:hp, angle:Math.random()*Math.PI*2, spin:(Math.random()-0.5)*0.03,
+                    colorTheme:themeStyle
+                });
+            }
+        }
+        
+        // 陨石被击中
+        function hitAsteroid(ast, index){
+            ast.hp--;
+            playPianoHit(300 + ast.maxHp*40);
+            if(ast.hp <= 0){
+                // 碎裂
+                for(let i=0;i<8;i++) fragments.push({x:ast.x,y:ast.y, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, life:0.8, size:3});
+                addScreenShake();
+                asteroids.splice(index,1);
+                // 生成宝石 重力宝石
+                let gemX = ast.x, gemY = ast.y;
+                let gemObj = {
+                    x:gemX, y:gemY, vx:(Math.random()-0.5)*2, vy:-3, gravity:0.3, targetX:40, targetY:55, active:true, color:`hsl(${Math.random()*360},70%,60%)`, name:"宝石"
+                };
+                gems.push(gemObj);
+                addGemToLibrary();
+                updateGemUI();
+                // 通关检测
+                if(asteroids.length === 0){
+                    nextLevel();
+                }
+            }else{
+                // 闪烁白屏效果
+                canvas.style.filter = "brightness(1.4)";
+                setTimeout(()=>canvas.style.filter="", 70);
+            }
+        }
+        
+        function nextLevel(){
+            if(currentLevel+1 <= 999){
+                currentLevel++;
+                saveData.level = currentLevel;
+                persist();
+                document.getElementById('levelNum').innerText = currentLevel;
+                initLevel(currentLevel);
+                updateDifficultyTheme();
+            } else {
+                toastMsg("🎉 恭喜通关星辰之旅！你是传奇 🎉");
+            }
+        }
+        
+        function updateGemUI(){
+            document.getElementById('totalGemCount').innerText = saveData.totalGems;
+        }
+        function updateUIValues(){
+            document.getElementById('levelNum').innerText = saveData.level;
+            document.getElementById('totalGemCount').innerText = saveData.totalGems;
+            currentLevel = saveData.level;
+        }
+        
+        function updateDifficultyTheme(){ 
+            // 难度每关陨石血量随关卡上升
+            // 更新主题背景色调已在draw中
+        }
+        
+        // 宝石自动飞向角落收集器
+        function updateGems(){
+            for(let i=0;i<gems.length;i++){
+                let g = gems[i];
+                g.vy += g.gravity;
+                g.x += g.vx;
+                g.y += g.vy;
+                let targetPos = {x:45, y:65};
+                let dx = targetPos.x - g.x, dy = targetPos.y - g.y;
+                let dist = Math.hypot(dx,dy);
+                if(dist < 35){
+                    gems.splice(i,1);
+                    // 收集音效
+                    playPianoHit(880);
+                    toastMsg(`💎 +1 宝石! 已存入宝库`);
+                    continue;
+                }
+                if(dist<150){
+                    let speedUp = 0.2;
+                    g.vx += dx*0.03;
+                    g.vy += dy*0.03;
+                    let maxSpeed = 7;
+                    if(Math.abs(g.vx)>maxSpeed) g.vx = g.vx>0?maxSpeed:-maxSpeed;
+                    if(Math.abs(g.vy)>maxSpeed) g.vy = g.vy>0?maxSpeed:-maxSpeed;
+                }
+                if(g.x<0 || g.x>width || g.y>height) gems.splice(i,1);
+            }
+        }
+        
+        // 更新粒子
+        function updateParticles(){
+            for(let i=0;i<particles.length;i++){
+                particles[i].x+=particles[i].vx;
+                particles[i].y+=particles[i].vy;
+                particles[i].life-=0.02;
+                if(particles[i].life<=0 || particles[i].y>height+50) particles.splice(i,1);
+            }
+            for(let i=0;i<fragments.length;i++){
+                fragments[i].x+=fragments[i].vx;
+                fragments[i].y+=fragments[i].vy;
+                fragments[i].life-=0.02;
+                if(fragments[i].life<=0) fragments.splice(i,1);
+            }
+        }
+        
+        // 点击交互：发射彩色粒子簇 + 范围击中陨石
+        function handleShoot(e){
+            const rect = canvas.getBoundingClientRect();
+            let clickX = (e.clientX - rect.left) * (width/rect.width);
+            let clickY = (e.clientY - rect.top) * (height/rect.height);
+            createClickParticles(clickX,clickY);
+            // 检测陨石命中 (近圆形)
+            for(let i=asteroids.length-1;i>=0;i--){
+                let a = asteroids[i];
+                let dx = clickX - a.x, dy = clickY - a.y;
+                let dist = Math.hypot(dx,dy);
+                if(dist < a.radius+12){
+                    hitAsteroid(a,i);
+                    break; // 一次点击只击中一个陨石，但释放多粒子
+                }
+            }
+        }
+        
+        // 画图核心
+        let bgGradient;
+        function draw(){
+            if(!ctx) return;
+            // 背景主题
+            let gradient;
+            if(themeStyle === 'classic') gradient = ctx.createLinearGradient(0,0,width,height);
+            else if(themeStyle === 'deepblue') gradient = ctx.createLinearGradient(0,0,width,height);
+            else if(themeStyle === 'neon') gradient = ctx.createRadialGradient(width/2,height/2,100,width/2,height/2,600);
+            else gradient = ctx.createLinearGradient(0,0,0,height);
+            switch(themeStyle){
+                case 'classic': gradient.addColorStop(0,'#2b1040'); gradient.addColorStop(1,'#1a0a2a'); break;
+                case 'deepblue': gradient.addColorStop(0,'#021b33'); gradient.addColorStop(1,'#001a33'); break;
+                case 'neon': gradient.addColorStop(0,'#0a0f2a'); gradient.addColorStop(1,'#10062e'); ctx.fillStyle="#0a0f2a"; break;
+                case 'sunset': gradient.addColorStop(0,'#ff7e5e'); gradient.addColorStop(1,'#feb47b'); break;
+                case 'forest': gradient.addColorStop(0,'#0f3b2c'); gradient.addColorStop(1,'#1b523a'); break;
+                default: gradient.addColorStop(0,'#1e1a3a'); gradient.addColorStop(1,'#0c0820');
+            }
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0,0,width,height);
+            // 绘制陨石多边形
+            for(let a of asteroids){
+                ctx.save();
+                ctx.shadowBlur = qualityMode==='super'?12:4;
+                ctx.shadowColor = "white";
+                ctx.beginPath();
+                let sides = 6;
+                let angleStep = (Math.PI*2)/sides;
+                let rot = a.angle;
+                ctx.moveTo(a.x + Math.cos(rot)*a.radius, a.y+Math.sin(rot)*a.radius);
+                for(let i=1;i<=sides;i++){
+                    let ang = rot + i*angleStep;
+                    let x = a.x + Math.cos(ang)*a.radius;
+                    let y = a.y + Math.sin(ang)*a.radius;
+                    ctx.lineTo(x,y);
+                }
+                ctx.closePath();
+                let hpPercent = a.hp/a.maxHp;
+                let fillColor = themeStyle==='neon'? `#ff44ee` : `#c97eff`;
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+                ctx.strokeStyle = 'gold';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = 'white';
+                ctx.font = "bold 14px monospace";
+                ctx.fillText("❤️".repeat(a.hp), a.x-15, a.y-12);
+                a.angle += a.spin;
+            }
+            // 宝石
+            for(let g of gems){
+                ctx.beginPath();
+                ctx.arc(g.x,g.y,9,0,Math.PI*2);
+                ctx.fillStyle = g.color;
+                ctx.shadowBlur=12;
+                ctx.fill();
+                ctx.fillStyle="gold";
+                ctx.font="12px monospace"; ctx.fillText("💎",g.x-6,g.y+4);
+            }
+            // 粒子
+            for(let p of particles){
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+                ctx.fill();
+            }
+            for(let f of fragments){
+                ctx.globalAlpha = f.life;
+                ctx.fillStyle = "#ffaa66";
+                ctx.fillRect(f.x-3,f.y-3,5,5);
+            }
+            ctx.globalAlpha = 1;
+            // 计数器装饰
+            ctx.font = "20px monospace";
+            ctx.fillStyle="white";
+        }
+        
+        // 性能监测 & 弹窗
+        let lagCount=0;
+        function fpsMonitor(){
+            let now = performance.now();
+            let delta = now-lastTime;
+            if(delta>0) fps = Math.round(1000/delta);
+            document.getElementById('fpsMeter').innerText = `FPS: ${fps>0?fps:0}`;
+            if(fps<35 && qualityMode!=='fast'){
+                lagCount++;
+                if(lagCount>30){
+                    toastMsg("⚠️ 检测到卡顿，建议切换「快速模式」⚡");
+                    lagCount=0;
+                }
+            }else lagCount=0;
+            lastTime=now;
+        }
+        
+        function toastMsg(msg){
+            let toast = document.getElementById('toastMsg');
+            toast.innerText = msg;
+            toast.style.opacity='1';
+            setTimeout(()=>toast.style.opacity='0',1800);
+        }
+        
+        // 事件绑定
+        function resizeCanvas(){
+            width = window.innerWidth; height = window.innerHeight;
+            canvas.width = width; canvas.height = height;
+            if(asteroids.length===0 && currentLevel) initLevel(currentLevel);
+        }
+        
+        // 初始化游戏
+        function startGame(){
+            loadSave();
+            resizeCanvas();
+            initLevel(saveData.level);
+            currentLevel = saveData.level;
+            themeStyle = saveData.theme;
+            qualityMode = saveData.quality;
+            updateGemUI();
+            canvas.addEventListener('click', (e)=>{ handleShoot(e); if(!isAudioAllowed && audioCtx===null) { initAudio(); isAudioAllowed=true;}});
+            // 设置全屏
+            document.getElementById('fullscreenBtn').onclick = ()=>{ document.documentElement.requestFullscreen(); };
+            document.getElementById('settingsBtn').onclick = ()=>document.getElementById('settingsModal').style.visibility='visible';
+            document.getElementById('closeSettings').onclick = ()=>{
+                saveData.theme = document.getElementById('themeSelect').value;
+                saveData.quality = document.getElementById('qualitySelect').value;
+                saveData.bgVolume = document.getElementById('bgmVol').value/100;
+                saveData.sfxVolume = document.getElementById('sfxVol').value/100;
+                themeStyle = saveData.theme;
+                qualityMode = saveData.quality;
+                if(bgmGain) bgmGain.gain.value = saveData.bgVolume;
+                if(sfxGain) sfxGain.gain.value = saveData.sfxVolume;
+                persist();
+                document.getElementById('settingsModal').style.visibility='hidden';
+            };
+            document.getElementById('gemCounterBtn').onclick = ()=>{
+                let gridDiv = document.getElementById('gemGridContainer');
+                gridDiv.innerHTML = '';
+                saveData.gemLibrary.forEach(g=>{
+                    let card = document.createElement('div'); card.className='gem-card';
+                    card.innerHTML = `<div class="gem-icon" style="color:${g.color}">💎</div><div>${g.name}</div><div style="font-size:10px;">✨旋转宝石</div>`;
+                    gridDiv.appendChild(card);
+                });
+                if(saveData.gemLibrary.length===0) gridDiv.innerHTML='<div>暂无宝石，击碎陨石收集吧✨</div>';
+                document.getElementById('vaultModal').style.visibility='visible';
+            };
+            document.getElementById('closeVault').onclick = ()=> document.getElementById('vaultModal').style.visibility='hidden';
+            document.getElementById('muteToggleBtn').onclick = ()=>{
+                masterMute = !masterMute;
+                if(bgmGain) bgmGain.gain.value = masterMute?0:saveData.bgVolume;
+                if(sfxGain) sfxGain.gain.value = masterMute?0:saveData.sfxVolume;
+                toastMsg(masterMute?"🔇 全局静音":"🔊 音效开启");
+            };
+            window.addEventListener('resize',resizeCanvas);
+            function animate(){
+                if(qualityMode!=='fast'){ updateParticles(); updateGems(); }
+                else { updateGems(); particles = particles.slice(0,30); }
+                fpsMonitor();
+                draw();
+                requestAnimationFrame(animate);
+            }
+            animate();
+            setInterval(()=>{ if(asteroids.length===0 && currentLevel) nextLevel(); },500);
+            document.getElementById('themeSelect').value = saveData.theme;
+            document.getElementById('qualitySelect').value = saveData.quality;
+            document.getElementById('bgmVol').value = saveData.bgVolume*100;
+            document.getElementById('sfxVol').value = saveData.sfxVolume*100;
+        }
+        startGame();
+    })();
+</script>
+</body>
+</html>

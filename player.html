@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Player | Hardopera</title>
-    <meta name="keywords" content="Hardopera Music Player,Audio Player,Electronic Music,Hardstyle,Trance" />
-    <meta name="description" content="Hardopera custom music player for electronic music." />
+    <meta name="keywords" content="Hardopera Music Player,DJ Turntable,Audio Player,Electronic Music,Hardstyle,Trance" />
+    <meta name="description" content="Hardopera DJ style turntable music player with visual disc and custom controls." />
     <link rel="icon" href="https://hardopera.com/favicon.gif" type="image/gif" />
     <link rel=apple-touch-icon href="https://hardopera.com/apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -145,15 +145,74 @@
             height: auto;
         }
 
-        /* ========== 播放器核心样式 ========== */
+        /* ========== DJ打碟转盘 + 播放器主体样式 ========== */
         .player-card {
             background: rgba(0, 10, 30, 0.75);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(0,255,255,0.25);
-            border-radius: 16px;
-            padding: 30px 25px;
+            border-radius: 20px;
+            padding: 35px 25px;
             margin: 30px auto;
         }
+
+        /* DJ转盘容器 */
+        .turntable-wrap {
+            position: relative;
+            width: clamp(200px, 60vw, 320px);
+            height: clamp(200px, 60vw, 320px);
+            margin: 0 auto 30px;
+        }
+        /* 转盘外圈底座 */
+        .turntable-base {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle, #110022 60%, #000 100%);
+            border: 3px solid rgba(0,255,255,0.3);
+            box-shadow: 0 0 30px rgba(0,255,255,0.2), inset 0 0 40px rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* 旋转黑胶唱片 */
+        .vinyl-disc {
+            width: 85%;
+            height: 85%;
+            border-radius: 50%;
+            background: #000;
+            background-image: 
+                repeating-radial-gradient(
+                    circle at center,
+                    #1a1a1a 0px,
+                    #1a1a1a 2px,
+                    #000 2px,
+                    #000 8px
+                );
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.4);
+            transition: transform 0.1s linear;
+        }
+        /* 唱片中心 */
+        .vinyl-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20%;
+            height: 20%;
+            border-radius: 50%;
+            background: #0ff;
+            box-shadow: 0 0 15px #0ff;
+        }
+        /* 播放中旋转动画 */
+        .playing .vinyl-disc {
+            animation: rotateDisc 3s linear infinite;
+        }
+        @keyframes rotateDisc {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* 歌曲信息 */
         .track-title {
             font-family: 'Orbitron', sans-serif;
             font-size: clamp(20px, 5vw, 28px);
@@ -164,14 +223,98 @@
             font-size: 16px;
             margin-bottom: 25px;
         }
-        /* 音频原生控件美化 */
-        audio {
+
+        /* 进度条 */
+        .progress-bar {
             width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 3px;
+            margin: 10px 0 20px;
+            cursor: pointer;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #0ff, #ff00ff);
+            border-radius: 3px;
+            transition: width 0.1s linear;
+        }
+        .time-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 20px;
+        }
+
+        /* 控制按钮组 */
+        .control-buttons {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            margin: 25px 0;
+        }
+        .ctrl-btn {
+            width: 50px;
             height: 50px;
+            border-radius: 50%;
+            border: 1px solid rgba(0,255,255,0.4);
+            background: rgba(0,20,40,0.6);
+            color: #0ff;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .ctrl-btn:hover {
+            background: rgba(0,255,255,0.2);
+            box-shadow: 0 0 15px #0ff;
+        }
+        .play-btn {
+            width: 65px;
+            height: 65px;
+            font-size: 26px;
+        }
+
+        /* 音量控制 */
+        .volume-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .volume-icon {
+            color: #0ff;
+            font-size: 18px;
+        }
+        .volume-slider {
+            width: 120px;
+            height: 4px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+        .volume-fill {
+            height: 100%;
+            width: 70%;
+            background: #ff00ff;
+            border-radius: 2px;
+        }
+
+        /* 隐藏原生音频控件 */
+        audio {
+            display: none;
         }
         .player-desc {
-            margin-top: 20px;
+            margin-top: 25px;
             font-size: 15px;
+            color: rgba(255,255,255,0.7);
         }
     </style>
 </head>
@@ -188,7 +331,6 @@
     </ul>
 </div>
 
-<!-- 动态分形背景（保留原视觉特效） -->
 <div id="game-world">
     <canvas id="background-canvas" class="fractal-layer"></canvas>
     <canvas id="mid-canvas" class="fractal-layer"></canvas>
@@ -196,23 +338,53 @@
 
 <div class="content-wrap">
     <div class="content">
-        <h1>Audio Player</h1>
-        <p><strong>Custom Electronic Music Player</strong></p>
+        <h1>DJ TURNTABLE PLAYER</h1>
+        <p><strong>Electronic Music DJ Style Player</strong></p>
 
-        <!-- 播放器主体卡片 -->
-        <div class="player-card">
+        <div class="player-card" id="playerBox">
+            <!-- DJ打碟转盘 -->
+            <div class="turntable-wrap">
+                <div class="turntable-base">
+                    <div class="vinyl-disc"></div>
+                </div>
+                <div class="vinyl-center"></div>
+            </div>
+
+            <!-- 歌曲信息 -->
             <div class="track-title">Push Through</div>
             <div class="track-artist">MBW</div>
-            <!-- 原生HTML5音频播放器 -->
-            <audio controls preload="metadata">
-                <!-- 替换为你的音频地址 -->
+
+            <!-- 进度条 + 时间 -->
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="time-text">
+                <span id="currentTime">00:00</span>
+                <span id="totalTime">00:00</span>
+            </div>
+
+            <!-- 播放控制按钮 -->
+            <div class="control-buttons">
+                <button class="ctrl-btn" id="prevBtn">⏮</button>
+                <button class="ctrl-btn play-btn" id="playBtn">▶</button>
+                <button class="ctrl-btn" id="nextBtn">⏭</button>
+            </div>
+
+            <!-- 音量控制 -->
+            <div class="volume-wrap">
+                <span class="volume-icon">🔊</span>
+                <div class="volume-slider" id="volumeBar">
+                    <div class="volume-fill" id="volumeFill"></div>
+                </div>
+            </div>
+
+            <!-- 原生音频（隐藏，做底层播放） -->
+            <audio id="audioPlayer" preload="metadata">
                 <source src="audio/push-through.mp3" type="audio/mpeg">
-                你的浏览器不支持音频播放，请更换浏览器。
+                浏览器不支持音频播放
             
-            <p class="player-desc">
-                Hardstyle / Hard Dance · 152 BPM<br>
-                Custom built player for electronic music collection
-            </p>
+
+            <p class="player-desc">Hardstyle / Hard Dance · 152 BPM | DJ Turntable Visual Player</p>
         </div>
 
         <p>&nbsp;</p>
@@ -224,12 +396,82 @@
     </div>
 </div>
 
-<!-- 原动态背景JS 完全保留 -->
+<!-- 动态背景JS -->
 <script>
-const bgCanvas=document.getElementById('background-canvas');const midCanvas=document.getElementById('mid-canvas');const bgCtx=bgCanvas.getContext('2d');const midCtx=midCanvas.getContext('2d');let width,height,fractalTime=0;const seed=Math.random();const fractalBranches=Math.floor(3+seed*6);const fractalDepth=Math.floor(4+seed*3);const fractalLength=70+seed*90;const fractalAngle=0.3+seed*0.7;const rotateSpeed=0.02+seed*0.06;function resizeCanvas(){width=window.innerWidth;height=window.innerHeight;bgCanvas.width=width;bgCanvas.height=height;midCanvas.width=width;midCanvas.height=height}resizeCanvas();window.addEventListener('resize',resizeCanvas);const colorSet=[['#ff00ff','#00ffff','#7000ff'],['#ff66ff','#00ffcc','#9944ff'],['#ff0066','#00eeff','#aa00ff'],['#cc00ff','#33ffff','#6600ff']];const randomColors=colorSet[Math.floor(Math.random()*colorSet.length)];const nebulaPoints=Array.from({length:12+Math.floor(Math.random()*8)},()=>({x:Math.random()*3000,y:Math.random()*3000,size:280+Math.random()*700,color:Math.floor(Math.random()*randomColors.length),speed:0.15+Math.random()*0.5,phase:Math.random()*Math.PI*2}));const palette={bg:'#050010',stars:randomColors,accent:randomColors[Math.floor(Math.random()*randomColors.length)]};function animate(timestamp){fractalTime=timestamp/1000;fractalTime=timestamp/1000;bgCtx.clearRect(0,0,width,height);nebulaPoints.forEach(p=>{const pulse=Math.sin(fractalTime*p.speed+p.phase);const size=p.size*(1+pulse*0.18);const g=bgCtx.createRadialGradient(width/2,height/2,0,width/2,height/2,size);g.addColorStop(0,palette.stars[p.color]+'60');g.addColorStop(1,'transparent');bgCtx.fillStyle=g;bgCtx.beginPath();bgCtx.arc(width/2,height/2,size,0,Math.PI*2);bgCtx.fill()});midCtx.clearRect(0,0,width,height);midCtx.save();midCtx.translate(width/2,height/2);midCtx.rotate(fractalTime*rotateSpeed);midCtx.strokeStyle=palette.accent;midCtx.lineWidth=1;function drawFractal(x,y,a,l,d){if(d<=0)return;const x2=x+Math.cos(a)*l;const y2=y+Math.sin(a)*l;midCtx.beginPath();midCtx.moveTo(x,y);midCtx.lineTo(x2,y2);midCtx.stroke();drawFractal(x2,y2,a-fractalAngle,l*0.7,d-1);drawFractal(x2,y2,a+fractalAngle,l*0.7,d-1)}for(let i=0;i<fractalBranches;i++)drawFractal(0,0,(Math.PI*2/fractalBranches)*i,fractalLength,fractalDepth);midCtx.restore();requestAnimationFrame(animate)}animate(0);
+const bgCanvas=document.getElementById('background-canvas');const midCanvas=document.getElementById('mid-canvas');const bgCtx=bgCanvas.getContext('2d');const midCtx=midCanvas.getContext('2d');let width,height,fractalTime=0;const seed=Math.random();const fractalBranches=Math.floor(3+seed*6);const fractalDepth=Math.floor(4+seed*3);const fractalLength=70+seed*90;const fractalAngle=0.3+seed*0.7;const rotateSpeed=0.02+seed*0.06;function resizeCanvas(){width=window.innerWidth;height=window.innerHeight;bgCanvas.width=width;bgCanvas.height=height;midCanvas.width=width;midCanvas.height=height}resizeCanvas();window.addEventListener('resize',resizeCanvas);const colorSet=[['#ff00ff','#00ffff','#7000ff'],['#ff66ff','#00ffcc','#9944ff'],['#ff0066','#00eeff','#aa00ff'],['#cc00ff','#33ffff','#6600ff']];const randomColors=colorSet[Math.floor(Math.random()*colorSet.length)];const nebulaPoints=Array.from({length:12+Math.floor(Math.random()*8)},()=>({x:Math.random()*3000,y:Math.random()*3000,size:280+Math.random()*700,color:Math.floor(Math.random()*randomColors.length),speed:0.15+Math.random()*0.5,phase:Math.random()*Math.PI*2}));const palette={bg:'#050010',stars:randomColors,accent:randomColors[Math.floor(Math.random()*randomColors.length)]};function animate(timestamp){fractalTime=timestamp/1000;bgCtx.clearRect(0,0,width,height);nebulaPoints.forEach(p=>{const pulse=Math.sin(fractalTime*p.speed+p.phase);const size=p.size*(1+pulse*0.18);const g=bgCtx.createRadialGradient(width/2,height/2,0,width/2,height/2,size);g.addColorStop(0,palette.stars[p.color]+'60');g.addColorStop(1,'transparent');bgCtx.fillStyle=g;bgCtx.beginPath();bgCtx.arc(width/2,height/2,size,0,Math.PI*2);bgCtx.fill()});midCtx.clearRect(0,0,width,height);midCtx.save();midCtx.translate(width/2,height/2);midCtx.rotate(fractalTime*rotateSpeed);midCtx.strokeStyle=palette.accent;midCtx.lineWidth=1;function drawFractal(x,y,a,l,d){if(d<=0)return;const x2=x+Math.cos(a)*l;const y2=y+Math.sin(a)*l;midCtx.beginPath();midCtx.moveTo(x,y);midCtx.lineTo(x2,y2);midCtx.stroke();drawFractal(x2,y2,a-fractalAngle,l*0.7,d-1);drawFractal(x2,y2,a+fractalAngle,l*0.7,d-1)}for(let i=0;i<fractalBranches;i++)drawFractal(0,0,(Math.PI*2/fractalBranches)*i,fractalLength,fractalDepth);midCtx.restore();requestAnimationFrame(animate)}animate(0);
 </script>
 
-<!-- 统计脚本保留 -->
+<!-- DJ转盘 + 播放器交互JS -->
+<script>
+// 获取元素
+const audio = document.getElementById('audioPlayer');
+const playBtn = document.getElementById('playBtn');
+const playerBox = document.getElementById('playerBox');
+const progressBar = document.getElementById('progressBar');
+const progressFill = document.getElementById('progressFill');
+const currentTimeEl = document.getElementById('currentTime');
+const totalTimeEl = document.getElementById('totalTime');
+const volumeBar = document.getElementById('volumeBar');
+const volumeFill = document.getElementById('volumeFill');
+
+// 格式化时间 分:秒
+function formatTime(sec) {
+    let m = Math.floor(sec / 60);
+    let s = Math.floor(sec % 60);
+    return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+
+// 播放/暂停切换
+playBtn.addEventListener('click', () => {
+    if(audio.paused) {
+        audio.play();
+        playBtn.textContent = '⏸';
+        playerBox.classList.add('playing');
+    } else {
+        audio.pause();
+        playBtn.textContent = '▶';
+        playerBox.classList.remove('playing');
+    }
+});
+
+// 音频加载完成，显示总时长
+audio.addEventListener('loadedmetadata', () => {
+    totalTimeEl.textContent = formatTime(audio.duration);
+});
+
+// 实时更新进度条与当前时间
+audio.addEventListener('timeupdate', () => {
+    const percent = (audio.currentTime / audio.duration) * 100;
+    progressFill.style.width = percent + '%';
+    currentTimeEl.textContent = formatTime(audio.currentTime);
+});
+
+// 点击进度条跳转播放位置
+progressBar.addEventListener('click', (e) => {
+    const barWidth = progressBar.offsetWidth;
+    const clickX = e.offsetX;
+    const rate = clickX / barWidth;
+    audio.currentTime = audio.duration * rate;
+});
+
+// 音量调节
+volumeBar.addEventListener('click', (e) => {
+    const barWidth = volumeBar.offsetWidth;
+    const clickX = e.offsetX;
+    const volume = clickX / barWidth;
+    audio.volume = volume;
+    volumeFill.style.width = (volume * 100) + '%';
+});
+
+// 播放结束重置状态
+audio.addEventListener('ended', () => {
+    playBtn.textContent = '▶';
+    playerBox.classList.remove('playing');
+    progressFill.style.width = '0%';
+});
+</script>
+
+<!-- 统计脚本 -->
 <script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
 <script>LA.init({id:"L2zFVRorfv9q3qJ4",ck:"L2zFVRorfv9q3qJ4"})</script>
 </body>

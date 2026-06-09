@@ -37,43 +37,41 @@
             backdrop-filter: blur(10px);
             z-index: 9999;
             border-bottom: 1px solid rgba(0,255,255,0.2);
-            /* 上下内边距缩小，节省高度 */
-            padding: 8px 10px;
+            padding: 6px 15px;
         }
         .nav-list {
             display: flex;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
-            /* 核心：禁止换行 */
             flex-wrap: nowrap !important;
-            /* 间距整体收窄，适配窄屏 */
-            gap: 8px 12px;
+            gap: 4px 8px; /* 极致缩小间距 */
             list-style: none;
             max-width: 100%;
             margin: 0 auto;
-            padding: 0 5px;
-            /* 超窄屏允许轻微横向滚动，保证全部显示 */
+            /* 左右大边距，彻底防止裁字 */
+            padding: 0 20px;
             overflow-x: auto;
-            /* 隐藏滚动条（美观） */
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-        /* 隐藏webkit滚动条 */
+        /* 隐藏滚动条 */
         .nav-list::-webkit-scrollbar {
             display: none;
         }
         .nav-list li {
-            flex-shrink: 0; /* 每个导航项禁止压缩变形 */
+            flex-shrink: 0;
         }
         .nav-list a {
             color: #fff;
             font-family: 'Orbitron', sans-serif;
-            /* 字体整体缩小，极小屏也能放下 */
-            font-size: clamp(11px, 2vw, 15px);
+            /* 自适应极小字体，保证完整显示 */
+            font-size: clamp(9px, 1.6vw, 13px);
             text-decoration: none;
             transition: 0.3s;
             white-space: nowrap;
             text-shadow: 0 0 8px rgba(0,255,255,0.3);
+            /* 增加字符间距，小字更清晰 */
+            letter-spacing: 0.2px;
         }
         .nav-list a:hover {
             color: #0ff;
@@ -111,8 +109,7 @@
             display: flex;
             align-items: flex-start;
             justify-content: center;
-            /* 顶部留出导航栏高度 */
-            padding: 70px 20px 60px;
+            padding: 58px 20px 60px;
         }
         .content {
             text-align: center;
@@ -175,10 +172,10 @@
     <ul class="nav-list">
         <li><a href="index.html" class="nav-logo">Hardopera</a></li>
         <li><a href="music.html">Music</a></li>
-<li><a href="player.html">Player</a></li>
+        <li><a href="player.html">Player</a></li>
         <li><a href="game.html">Game</a></li>
         <li><a href="apparel.html">Apparel</a></li>
-        <li><a href="automotive.html">Automotive</a></li>
+        <li><a href="auto.html">Auto</a></li>
         <li><a href="wallpaper.html">Wallpaper</a></li>
     </ul>
 </div>

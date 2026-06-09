@@ -37,23 +37,39 @@
             backdrop-filter: blur(10px);
             z-index: 9999;
             border-bottom: 1px solid rgba(0,255,255,0.2);
-            padding: 12px 15px;
+            /* 上下内边距缩小，节省高度 */
+            padding: 8px 10px;
         }
         .nav-list {
             display: flex;
             justify-content: center;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 14px 24px;
+            /* 核心：禁止换行 */
+            flex-wrap: nowrap !important;
+            /* 间距整体收窄，适配窄屏 */
+            gap: 8px 12px;
             list-style: none;
-            max-width: 1200px;
+            max-width: 100%;
             margin: 0 auto;
-            padding: 0 10px;
+            padding: 0 5px;
+            /* 超窄屏允许轻微横向滚动，保证全部显示 */
+            overflow-x: auto;
+            /* 隐藏滚动条（美观） */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* 隐藏webkit滚动条 */
+        .nav-list::-webkit-scrollbar {
+            display: none;
+        }
+        .nav-list li {
+            flex-shrink: 0; /* 每个导航项禁止压缩变形 */
         }
         .nav-list a {
             color: #fff;
             font-family: 'Orbitron', sans-serif;
-            font-size: clamp(14px, 3vw, 16px);
+            /* 字体整体缩小，极小屏也能放下 */
+            font-size: clamp(11px, 2vw, 15px);
             text-decoration: none;
             transition: 0.3s;
             white-space: nowrap;
@@ -95,7 +111,8 @@
             display: flex;
             align-items: flex-start;
             justify-content: center;
-            padding: 80px 20px 60px;
+            /* 顶部留出导航栏高度 */
+            padding: 70px 20px 60px;
         }
         .content {
             text-align: center;
@@ -203,7 +220,7 @@
         <p class="footer-text"><a href="shturl.cc/TGbsczTNxMzjjYlA" target="_blank"><img src="images/itchio.svg" width="61" height="61" border="0"><br>
         shturl.cc/dOIgnvT</a></p>
         <p class="footer-text"><a href="https://discord.com/channels/1029475141668839515/1511947960924246149" target="_blank"><img src="images/discord.svg" width="180" height="30" border="0"><br>
-      www.discord.com/channels/1029475141668839515/1511947960924246149</a></p>
+      www.discord.com/channels/1029475141668839515/15119479609246149</a></p>
       <p class="footer-text">2026</p>
     </div>
 </div>

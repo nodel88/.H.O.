@@ -37,24 +37,22 @@
             backdrop-filter: blur(10px);
             z-index: 9999;
             border-bottom: 1px solid rgba(0,255,255,0.2);
-            padding: 6px 15px;
+            padding: 6px 0; /* 左右0，交给内层list控制 */
         }
         .nav-list {
             display: flex;
-            justify-content: flex-start;
+            justify-content: center; /* 关键：水平居中 */
             align-items: center;
             flex-wrap: nowrap !important;
-            gap: 4px 8px; /* 极致缩小间距 */
+            gap: 4px 8px;
             list-style: none;
             max-width: 100%;
             margin: 0 auto;
-            /* 左右大边距，彻底防止裁字 */
-            padding: 0 20px;
-            overflow-x: auto;
+            padding: 0 20px; /* 左右安全边距，防裁切 */
+            overflow-x: auto; /* 小屏可滑动 */
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-        /* 隐藏滚动条 */
         .nav-list::-webkit-scrollbar {
             display: none;
         }
@@ -64,13 +62,11 @@
         .nav-list a {
             color: #fff;
             font-family: 'Orbitron', sans-serif;
-            /* 自适应极小字体，保证完整显示 */
             font-size: clamp(9px, 1.6vw, 13px);
             text-decoration: none;
             transition: 0.3s;
             white-space: nowrap;
             text-shadow: 0 0 8px rgba(0,255,255,0.3);
-            /* 增加字符间距，小字更清晰 */
             letter-spacing: 0.2px;
         }
         .nav-list a:hover {
@@ -175,7 +171,7 @@
         <li><a href="player.html">Player</a></li>
         <li><a href="game.html">Game</a></li>
         <li><a href="apparel.html">Apparel</a></li>
-        <li><a href="auto.html">Auto</a></li>
+        <li><a href="automotive.html">Automotive</a></li>
         <li><a href="wallpaper.html">Wallpaper</a></li>
     </ul>
 </div>

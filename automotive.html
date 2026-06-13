@@ -1,1 +1,185 @@
-
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Automotive | Hardopera</title>
+    <meta name="keywords" content="Car Wrap,Automotive Design,Hardopera Livery" />
+    <meta name="description" content="Custom vehicle wrap designs with Hardopera fractal art." />
+    <link rel="icon" href="https://hardopera.com/favicon.gif" type="image/gif" />
+    <link rel=apple-touch-icon href="https://hardopera.com/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Poppins:wght@400;600&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            background: #050010;
+            font-family: 'Poppins', sans-serif;
+            color: #fff;
+            overscroll-behavior: none;
+        }.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(10, 0, 30, 0.9);
+    backdrop-filter: blur(10px);
+    z-index: 9999;
+    border-bottom: 1px solid rgba(0,255,255,0.2);
+    padding: 12px 15px;
+}
+.nav-list {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px 24px; /* 水平+垂直间距 */
+    list-style: none;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 10px;
+}
+.nav-list a {
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(14px, 3vw, 16px);
+    text-decoration: none;
+    transition: 0.3s;
+    white-space: nowrap;
+    text-shadow: 0 0 8px rgba(0,255,255,0.3);
+}
+        .nav-list a:hover {
+            color: #0ff;
+            text-shadow: 0 0 15px #0ff;
+        }
+        #game-world {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        .fractal-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #background-canvas {
+            z-index: 1;
+            filter: blur(40px);
+        }
+        #mid-canvas {
+            z-index: 2;
+            mix-blend-mode: color-dodge;
+            opacity: 0.6;
+        }
+        .content-wrap {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 80px 20px 60px;
+        }
+        .content {
+            text-align: center;
+            width: 100%;
+            max-width: 700px;
+        }
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(32px, 10vw, 64px);
+            font-weight: 900;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(0,255,255,0.4);
+        }
+        p {
+            font-size: clamp(14px, 3.5vw, 18px);
+            line-height: 1.7;
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 16px;
+        }
+        strong {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700;
+            font-size: clamp(15px, 4vw, 20px);
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0,255,255,0.3);
+        }
+        a {
+            color: #CCFF00;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        a:hover {            color: #0ff;
+            text-shadow: 0 0 15px #0ff;
+        }
+        .footer-text {
+            margin-top: 30px;
+            font-size: clamp(13px, 3vw, 15px);
+            opacity: 0.8;
+            font-family: 'Orbitron', sans-serif;
+            line-height: 1.6;
+        }
+        img {
+            max-width: 100%;
+            height: auto;  }
+.nav-logo {
+    color: #0ff !important;
+    text-shadow: 0 0 15px #0ff !important;
+} </style>
+</head>
+<body>
+<div class="navbar">
+    <ul class="nav-list">
+        <li><a href="index.html" class="nav-logo">Hardopera</a></li>
+        <li><a href="music.html">Music</a></li>
+        <li><a href="player.html">Player</a></li>
+        <li><a href="game.html">Game</a></li>
+        <li><a href="apparel.html">Apparel</a></li>
+        <li><a href="automotive.html">Automotive</a></li>
+        <li><a href="wallpaper.html">Wallpaper</a></li>
+    </ul>
+</div>
+<div id="game-world">
+    <canvas id="background-canvas" class="fractal-layer"></canvas>
+    <canvas id="mid-canvas" class="fractal-layer"></canvas>
+</div>
+<div class="content-wrap">
+    <div class="content">
+        <h1>&nbsp;</h1>
+        <h1>Automotive</h1>
+      <p><strong>Custom Vehicle Wrap & Livery</strong></p>
+        <p>Original fractal graphics for full car wraps, blending neon cosmic textures and Hardopera art language.</p>
+        <p>Design solutions for sports cars, sedans and personalized vehicle styling.</p>
+        <p>Preview samples will be published here soon.</p>
+        <p>&nbsp;</p>
+        <p>&nbsp;</p>
+      <p><a href="index.html">← Back to Homepage</a></p>
+      <p>&nbsp;</p>
+      <p>&nbsp;</p>
+      <p>&nbsp;</p>
+      <p class="footer-text">E-mail: <a href="mailto:Hardopera@outlook.com">Hardopera@outlook.com</a></p>
+        <p class="footer-text"><a href="https://www.hardopera.com" target="_blank">www.hardopera.com</a></p>
+        <p class="footer-text">2026</p>
+  </div>
+</div>
+<script>
+const bgCanvas=document.getElementById('background-canvas');const midCanvas=document.getElementById('mid-canvas');const bgCtx=bgCanvas.getContext('2d');const midCtx=midCanvas.getContext('2d');let width,height,fractalTime=0;const seed=Math.random();const fractalBranches=Math.floor(3+seed*6);const fractalDepth=Math.floor(4+seed*3);const fractalLength=70+seed*90;const fractalAngle=0.3+seed*0.7;const rotateSpeed=0.02+seed*0.06;function resizeCanvas(){width=window.innerWidth;height=window.innerHeight;bgCanvas.width=width;bgCanvas.height=height;midCanvas.width=width;midCanvas.height=height}resizeCanvas();window.addEventListener('resize',resizeCanvas);const colorSet=[['#ff00ff','#00ffff','#7000ff'],['#ff66ff','#00ffcc','#9944ff'],['#ff0066','#00eeff','#aa00ff'],['#cc00ff','#33ffff','#6600ff']];const randomColors=colorSet[Math.floor(Math.random()*colorSet.length)];const nebulaPoints=Array.from({length:12+Math.floor(Math.random()*8)},()=>({x:Math.random()*3000,y:Math.random()*3000,size:280+Math.random()*700,color:Math.floor(Math.random()*randomColors.length),speed:0.15+Math.random()*0.5,phase:Math.random()*Math.PI*2}));const palette={bg:'#050010',stars:randomColors,accent:randomColors[Math.floor(Math.random()*randomColors.length)]};function animate(timestamp){fractalTime=timestamp/1000;bgCtx.clearRect(0,0,width,height);nebulaPoints.forEach(p=>{const pulse=Math.sin(fractalTime*p.speed+p.phase);const size=p.size*(1+pulse*0.18);const g=bgCtx.createRadialGradient(width/2,height/2,0,width/2,height/2,size);g.addColorStop(0,palette.stars[p.color]+'60');g.addColorStop(1,'transparent');bgCtx.fillStyle=g;bgCtx.beginPath();bgCtx.arc(width/2,height/2,size,0,Math.PI*2);bgCtx.fill()});midCtx.clearRect(0,0,width,height);midCtx.save();midCtx.translate(width/2,height/2);midCtx.rotate(fractalTime*rotateSpeed);midCtx.strokeStyle=palette.accent;midCtx.lineWidth=1;function drawFractal(x,y,a,l,d){if(d<=0)return;const x2=x+Math.cos(a)*l;const y2=y+Math.sin(a)*l;midCtx.beginPath();midCtx.moveTo(x,y);midCtx.lineTo(x2,y2);midCtx.stroke();drawFractal(x2,y2,a-fractalAngle,l*0.7,d-1);drawFractal(x2,y2,a+fractalAngle,l*0.7,d-1)}for(let i=0;i<fractalBranches;i++)drawFractal(0,0,(Math.PI*2/fractalBranches)*i,fractalLength,fractalDepth);midCtx.restore();requestAnimationFrame(animate)}animate(0);
+</script><script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
+<script>LA.init({id:"L2zFVRorfv9q3qJ4",ck:"L2zFVRorfv9q3qJ4"})</script>
+</body>
+</html>

@@ -9,6 +9,8 @@
     <meta name="description" content="Hardopera original fractal cosmic casual game." />
     <link rel="icon" href="https://hardopera.com/favicon.gif" type="image/gif" />
     <link rel=apple-touch-icon href="https://hardopera.com/apple-touch-icon.png">
+    <script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
+<script>LA.init({id:"L2zFVRorfv9q3qJ4",ck:"L2zFVRorfv9q3qJ4"})</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Poppins:wght@400;600&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
@@ -233,7 +235,6 @@ Thanks again! Feel free to share more feedback as you keep playing. This is my v
 </div>
 <script>
 const bgCanvas=document.getElementById('background-canvas');const midCanvas=document.getElementById('mid-canvas');const bgCtx=bgCanvas.getContext('2d');const midCtx=midCanvas.getContext('2d');let width,height,fractalTime=0;const seed=Math.random();const fractalBranches=Math.floor(3+seed*6);const fractalDepth=Math.floor(4+seed*3);const fractalLength=70+seed*90;const fractalAngle=0.3+seed*0.7;const rotateSpeed=0.02+seed*0.06;function resizeCanvas(){width=window.innerWidth;height=window.innerHeight;bgCanvas.width=width;bgCanvas.height=height;midCanvas.width=width;midCanvas.height=height}resizeCanvas();window.addEventListener('resize',resizeCanvas);const colorSet=[['#ff00ff','#00ffff','#7000ff'],['#ff66ff','#00ffcc','#9944ff'],['#ff0066','#00eeff','#aa00ff'],['#cc00ff','#33ffff','#6600ff']];const randomColors=colorSet[Math.floor(Math.random()*colorSet.length)];const nebulaPoints=Array.from({length:12+Math.floor(Math.random()*8)},()=>({x:Math.random()*3000,y:Math.random()*3000,size:280+Math.random()*700,color:Math.floor(Math.random()*randomColors.length),speed:0.15+Math.random()*0.5,phase:Math.random()*Math.PI*2}));const palette={bg:'#050010',stars:randomColors,accent:randomColors[Math.floor(Math.random()*randomColors.length)]};function animate(timestamp){fractalTime=timestamp/1000;bgCtx.clearRect(0,0,width,height);nebulaPoints.forEach(p=>{const pulse=Math.sin(fractalTime*p.speed+p.phase);const size=p.size*(1+pulse*0.18);const g=bgCtx.createRadialGradient(width/2,height/2,0,width/2,height/2,size);g.addColorStop(0,palette.stars[p.color]+'60');g.addColorStop(1,'transparent');bgCtx.fillStyle=g;bgCtx.beginPath();bgCtx.arc(width/2,height/2,size,0,Math.PI*2);bgCtx.fill()});midCtx.clearRect(0,0,width,height);midCtx.save();midCtx.translate(width/2,height/2);midCtx.rotate(fractalTime*rotateSpeed);midCtx.strokeStyle=palette.accent;midCtx.lineWidth=1;function drawFractal(x,y,a,l,d){if(d<=0)return;const x2=x+Math.cos(a)*l;const y2=y+Math.sin(a)*l;midCtx.beginPath();midCtx.moveTo(x,y);midCtx.lineTo(x2,y2);midCtx.stroke();drawFractal(x2,y2,a-fractalAngle,l*0.7,d-1);drawFractal(x2,y2,a+fractalAngle,l*0.7,d-1)}for(let i=0;i<fractalBranches;i++)drawFractal(0,0,(Math.PI*2/fractalBranches)*i,fractalLength,fractalDepth);midCtx.restore();requestAnimationFrame(animate)}animate(0);
-</script><script charset="UTF-8" id="LA_COLLECT" src="//sdk.51.la/js-sdk-pro.min.js"></script>
-<script>LA.init({id:"L2zFVRorfv9q3qJ4",ck:"L2zFVRorfv9q3qJ4"})</script>
+</script>
 </body>
 </html>
